@@ -51,8 +51,5 @@ def main():
     else:
         print("Please select a valid option.")
 
-
-
-
 if __name__ == '__main__':
     main()
