@@ -6,6 +6,7 @@ import multiprocessing
 import search_motif_multi
 import search_protein_multi
 import search_motif_gap_multi
+import motif_location_many
 
 def main():
     # Your code to handle the command-line arguments goes here
