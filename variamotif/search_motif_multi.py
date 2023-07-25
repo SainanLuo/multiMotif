@@ -127,9 +127,7 @@ def parse_arguments():
 
     return parser.parse_args()
 
-def main():
-    args = parse_arguments()
-
+def main(args):
     if not args.fasta or not args.motif:
         print("Please input fasta or motif")
     else:
@@ -152,4 +150,5 @@ def main():
                 print(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatch']}\t{mismatch_positions_str}\t{result['sequence']}")
 
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    main(args)

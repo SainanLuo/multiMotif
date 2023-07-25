@@ -41,13 +41,13 @@ def main():
     # Call the appropriate function from your package based on the user inputs
     # For example: variamotif.some_function(args.input_file, args.output)
     if args.T:
-        search_in_traditional_mode()
+        search_motif_multi.main(args)
     elif args.V:
-        search_in_variable_mode()
+        search_motif_gap_multi.main(args)
     elif args.P:
-        search_protein_sequence()
+        search_protein_multi.main(args)
     elif args.D:
-        display_your_table()
+        motif_location_many.main(args)
     else:
         print("Please select a valid option.")
 

@@ -88,14 +88,16 @@ def plot_motifs_to_single_chart(file_path, display_both_directions=False):
     plt.savefig(output_file)
     #plt.show()
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(description='Generate motif location chart from a table file.')
     parser.add_argument('-t', '--table', dest='table_file', required=True, help='Input table file.')
     parser.add_argument('-d', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
-    args = parser.parse_args()
+    return parser.parse_args()
 
+def main(args):
     plot_motifs_to_single_chart(args.table_file, args.display_both_directions)
 
 if __name__ == '__main__':
-    main()
+    args = parse_arguments()
+    main(args)
 

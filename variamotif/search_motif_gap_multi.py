@@ -104,8 +104,7 @@ def parse_arguments():
     parser.add_argument('-d', '--direction', type=str, default='+,-', choices=['+,-', '+', '-'], help='Search direction: both (default), forward, or reverse')
     return parser.parse_args()
 
-def main():
-    args = parse_arguments()
+def main(args):
 
     if not args.fasta or not args.motif1 or not args.motif2:
         print("请输入fasta文件路径、motif1和motif2")
@@ -138,4 +137,5 @@ def main():
                 print(f"{result['sequence_id']}\t{sequence_length}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches1']}\t{result['fragment1']}\t{result['mismatches2']}\t{result['fragment2']}\t{result['mismatches']}\t{result['gap']}\t{result['sequence']}")
 
 if __name__ == "__main__":
-    main()
+    args = parse_arguments()
+    main(args)
