@@ -118,32 +118,37 @@ def search_fasta_record(record, motif, max_mismatches, direction):
 
     return results
 
-# 命令行参数解析
-parser = argparse.ArgumentParser(description='Search for motif in a fasta file with allowed mismatches.')
-parser.add_argument('-f', '--fasta', type=str, help='Path to the fasta file')
-parser.add_argument('-motif', type=str, help='Target motif')
-parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
-parser.add_argument('-d', '--direction', default='+,-', type=str, choices=['+,-', '+', '-'], help='Search direction: both(default), forward, or reverse')
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Search for motif in a fasta file with allowed mismatches.')
+    parser.add_argument('-f', '--fasta', type=str, help='Path to the fasta file')
+    parser.add_argument('-motif', type=str, help='Target motif')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
+    parser.add_argument('-d', '--direction', default='+,-', type=str, choices=['+,-', '+', '-'], help='Search direction: both(default), forward, or reverse')
 
-args = parser.parse_args()
+    return parser.parse_args()
 
-if not args.fasta or not args.motif:
-    print("Please input fasta or motif")
-else:
-    fasta_file_path = args.fasta
-    motif = args.motif
-    max_mismatches = args.mismatches
-    direction = args.direction
-
-    records = list(SeqIO.parse(fasta_file_path, "fasta"))
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
-    results = pool.starmap(search_fasta_record, [(record, motif, max_mismatches, direction) for record in records])
-    results = [item for sublist in results for item in sublist]  # Flatten the list
-
-    if not results:
-        print("#No result")
+def main(args):
+    if not args.fasta or not args.motif:
+        print("Please input fasta or motif")
     else:
-        print("Sequence ID\tSequence Length\tmotif\tstart\tend\tstrand\tmismatch\tmismatch_positions\tprediction sequence") 
-        for result in results:
-            mismatch_positions_str = ",".join(str(pos) for pos in result['mismatch_positions'])
-            print(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatch']}\t{mismatch_positions_str}\t{result['sequence']}")
+        fasta_file_path = args.fasta
+        motif = args.motif
+        max_mismatches = args.mismatches
+        direction = args.direction
+
+        records = list(SeqIO.parse(fasta_file_path, "fasta"))
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+        results = pool.starmap(search_fasta_record, [(record, motif, max_mismatches, direction) for record in records])
+        results = [item for sublist in results for item in sublist]  # Flatten the list
+
+        if not results:
+            print("#No result")
+        else:
+            print("Sequence ID\tSequence Length\tmotif\tstart\tend\tstrand\tmismatch\tmismatch_positions\tprediction sequence") 
+            for result in results:
+                mismatch_positions_str = ",".join(str(pos) for pos in result['mismatch_positions'])
+                print(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatch']}\t{mismatch_positions_str}\t{result['sequence']}")
+
+if __name__ == "__main__":
+    args = parse_arguments()
+    main(args)
