@@ -93,43 +93,49 @@ def search_fasta_record(record, motif1, motif2, min_gap_length, max_gap_length, 
 
     return sequence_length, results
 
-# 命令行参数解析
-parser = argparse.ArgumentParser(description='Search for motif in a fasta file with allowed mismatches.')
-parser.add_argument('-f', '--fasta', type=str, help='Path to the fasta file')
-parser.add_argument('-motif1',required=True, type=str, help='First target motif')
-parser.add_argument('-motif2',default="None", type=str, help='Second target motif')
-parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='Minimum number of gaps between motifs')
-parser.add_argument('-max_g', '--max_gap', default=0, type=int, help='Maximum number of gaps between motifs')
-parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
-parser.add_argument('-d', '--direction', type=str, default='+,-', choices=['+,-', '+', '-'], help='Search direction: both (default), forward, or reverse')
-args = parser.parse_args()
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Search for motif in a fasta file with allowed mismatches.')
+    parser.add_argument('-f', '--fasta', type=str, help='Path to the fasta file')
+    parser.add_argument('-motif1',required=True, type=str, help='First target motif')
+    parser.add_argument('-motif2',default="None", type=str, help='Second target motif')
+    parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='Minimum number of gaps between motifs')
+    parser.add_argument('-max_g', '--max_gap', default=0, type=int, help='Maximum number of gaps between motifs')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
+    parser.add_argument('-d', '--direction', type=str, default='+,-', choices=['+,-', '+', '-'], help='Search direction: both (default), forward, or reverse')
+    return parser.parse_args()
 
-if not args.fasta or not args.motif1 or not args.motif2:
-    print("请输入fasta文件路径、motif1和motif2")
-else:
-    fasta_file_path = args.fasta
-    motif1 = args.motif1
-    motif2 = args.motif2
-    min_gap_length = args.min_gap
-    max_gap_length = args.max_gap
-    max_mismatches = args.mismatches
-    direction = args.direction
+def main():
+    args = parse_arguments()
 
-    records = list(SeqIO.parse(fasta_file_path, "fasta"))
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
-
-    # 使用starmap同时获取sequence_length和results
-    results_with_lengths = pool.starmap(search_fasta_record, [(record, motif1, motif2, min_gap_length, max_gap_length, max_mismatches,direction) for record in records])
-
-    # 解包sequence_length和results
-    sequence_lengths, results_list = zip(*results_with_lengths)
-
-    results = [item for sublist in results_list for item in sublist]  # 展平列表
-
-    # 打印包含sequence_length的输出
-    if not results:
-        print("#没有结果")
+    if not args.fasta or not args.motif1 or not args.motif2:
+        print("请输入fasta文件路径、motif1和motif2")
     else:
-        print("Sequence ID\tSequence Length\tmotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatch\tgap_length\tprediction sequence")
-        for sequence_length, result in zip(sequence_lengths, results):
-            print(f"{result['sequence_id']}\t{sequence_length}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches1']}\t{result['fragment1']}\t{result['mismatches2']}\t{result['fragment2']}\t{result['mismatches']}\t{result['gap']}\t{result['sequence']}")
+        fasta_file_path = args.fasta
+        motif1 = args.motif1
+        motif2 = args.motif2
+        min_gap_length = args.min_gap
+        max_gap_length = args.max_gap
+        max_mismatches = args.mismatches
+        direction = args.direction
+
+        records = list(SeqIO.parse(fasta_file_path, "fasta"))
+        pool = multiprocessing.Pool(multiprocessing.cpu_count())
+
+        # 使用starmap同时获取sequence_length和results
+        results_with_lengths = pool.starmap(search_fasta_record, [(record, motif1, motif2, min_gap_length, max_gap_length, max_mismatches,direction) for record in records])
+
+        # 解包sequence_length和results
+        sequence_lengths, results_list = zip(*results_with_lengths)
+
+        results = [item for sublist in results_list for item in sublist]  # 展平列表
+
+        # 打印包含sequence_length的输出
+        if not results:
+            print("#没有结果")
+        else:
+            print("Sequence ID\tSequence Length\tmotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatch\tgap_length\tprediction sequence")
+            for sequence_length, result in zip(sequence_lengths, results):
+                print(f"{result['sequence_id']}\t{sequence_length}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches1']}\t{result['fragment1']}\t{result['mismatches2']}\t{result['fragment2']}\t{result['mismatches']}\t{result['gap']}\t{result['sequence']}")
+
+if __name__ == "__main__":
+    main()
