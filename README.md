@@ -113,6 +113,38 @@ To merge multiple motif scanning results:
 variamotif -VisualMotif -t many_files.txt -o multi -r
 ```
 
+## Utility for Extracting Gene Sequences
+
+This utility can be used to extract either promoter sequences or open reading frames (ORFs) from a given genomic sequence. It takes as input a FASTA file containing the genomic sequence and a GFF file containing the gene annotations. Users can specify the desired upstream and downstream lengths relative to the start of each gene.
+
+Usage:
+
+```
+$ perl get_promoter_or_orf.pl [options]
+```
+
+Options:
+
+```
+-f, --fna <file>            Input FASTA file (required)
+-g, --gff <file>            Input GFF file (required)
+-up, --upstream <value>     Length of upstream region from gene start location (optional, default is 400)
+-down, --downstream <value> Length of downstream region from gene start location (optional, default is 0)
+-o, --output <file>         Output file (required)
+--promoter                  Extract promoters
+--orf                       Extract ORFs
+-h                          Display this help and exit
+```
+
+Example:
+
+This example demonstrates how to extract the promoter sequences of genes from a given genomic sequence. The upstream length is set to 400 base pairs, and the downstream length is set to 0. The output is saved in a file named `GCA_000009045.1.promoter.fa`
+
+```
+$ perl get_promoter_or_orf.pl -f GCA_000009045.1_ASM904v1_genomic.fna -g genomic.gff -up 400 -down 0 -o GCA_000009045.1.promoter.fa --promoter
+```
+
+
 ## Runtime Records
 
 CodY, genome size 4.1M, 15bp motif, both strands, 2 mismatches, runtime 12 seconds.
