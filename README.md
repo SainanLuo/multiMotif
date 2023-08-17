@@ -74,29 +74,29 @@ optional arguments:
 (1) Fixed length DNA motif (CodY, AATTTTCWGAAAATT)
 
 ```
-variamotif -f GCA_000009045.1.promoter.fa -fix -DNA -motif1 AATTTTCWGAAAATT -m 2 -d +,- -o CodY.fix.out -i
+variamotif -VariaMotif -f GCA_000009045.1.promoter.fa -fix -DNA -motif1 AATTTTCWGAAAATT -m 2 -d +,- -o CodY.fix.out -i
 ```
 (2) Variable length DNA motif (CcpA, TGTAAA-N(0-40)-TTTACA)
 
 ```
-variamotif -f GCA_000008765.1.promoter.fa -variable -DNA -motif1 TGTAAA -motif2 TTTACA -min_g 0 -max_g 40 -m 0 -d + -o CcpA.variable.out -i
+variamotif -VariaMotif -f GCA_000008765.1.promoter.fa -variable -DNA -motif1 TGTAAA -motif2 TTTACA -min_g 0 -max_g 40 -m 0 -d + -o CcpA.variable.out -i
 ```
 
 (3) Fixed length protein motif
 
 ```
-variamotif -f 105.HTH.fa -fix -protein -motif1 GXTRSVIVN -m 0 -o one_motif.out -i
+variamotif -VariaMotif -f 105.HTH.fa -fix -protein -motif1 GXTRSVIVN -m 0 -o one_motif.out -i
 ```
 
 (4) Variable length protein motif
 
 ```
-variamotif -f 105.HTH.fa -variable -protein -motif1 GXTRSVIVN -motif2 LGMKGT -min_g 15 -max_g 15 -m 0 -o motif_gap.out -i
+variamotif -VariaMotif -f 105.HTH.fa -variable -protein -motif1 GXTRSVIVN -motif2 LGMKGT -min_g 15 -max_g 15 -m 0 -o motif_gap.out -i
 ```
 (5) RNA
 
 ```
-variamotif -f RNA_random.fa -fix -RNA -motif1 ACCGUUUUGAAAGGCG -m 0 -o motif.out -i
+variamotif -VariaMotif -f RNA_random.fa -fix -RNA -motif1 ACCGUUUUGAAAGGCG -m 0 -o motif.out -i
 ```
 
 ## Visualization Tool: VisualMotif
