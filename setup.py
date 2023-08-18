@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='variamotif',
-    version='0.1',
+    version='0.2.1',
     packages=find_packages(),
     install_requires=[
         'biopython>=1.78',
