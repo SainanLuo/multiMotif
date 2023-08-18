@@ -3,12 +3,24 @@
 
 ## Installation
 
-To install VariaMotif, you can clone the repository and then install it using [pip](https://pip.pypa.io/en/stable/installation/):
+To install VariaMotif, you can use [pip](https://pip.pypa.io/en/stable/installation/):
+
+```
+pip install variamotif
+```
+
+
+Or clone the repository and then install it local:
 
 ```
 git clone https://github.com/Luo-Sainan/VariaMotif.git
 cd VariaMotif
 pip install .
+```
+If you are a Windows user, make sure you installed [Python3](https://www.python.org/downloads/), then run this command in your `cmd` or `PowerShell`:
+
+```
+pip install variamotif
 ```
 
 ## Dependencies
