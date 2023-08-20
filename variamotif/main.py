@@ -1,16 +1,15 @@
 import argparse
+from Bio import SeqIO
 import multiprocessing
 from itertools import product
-
-from Bio import SeqIO
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
-import numpy as np
 import pandas as pd
-
+import matplotlib
 matplotlib.use('Agg')  # Set non-interactive backend to prevent X11 window creation
-
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.patches import Patch
+from Bio.Seq import Seq
+from Bio.SeqRecord import SeqRecord
 
 #DNA
 def generate_motif_variants(motif):
@@ -108,7 +107,6 @@ def reverse_search(record, motif, max_mismatches, motif_length):
             results.append(result)
 
     return results
-
 def reverse_search_fix(record, motif, max_mismatches, motif_length):
     variants = generate_motif_variants(motif)
     sequence = str(record.seq.reverse_complement())
@@ -331,6 +329,14 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
 def main():
     parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
+    parser.add_argument('-extract_sequences', '--extract_sequences',action="store_true", help='extract promoter or orf sequences')
+    parser.add_argument("-fna", "--fna", type=str, help="Input FNA file")
+    parser.add_argument("-gff", "--gff", type=str, help="Input GFF file")
+    parser.add_argument("-up", "--upstream", dest="upstream", type=int, default=400, help="Gene start location upstream length (optional, default is 400)")
+    parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="Gene start location downstream length (optional, default is 0)")
+    parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoters")
+    parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORFs")
+
     parser.add_argument('-VariaMotif', '--VariaMotif',action="store_true", help='motif scanning')
     parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
     parser.add_argument('-motif1', type=str, help='motif1,required=True')
@@ -384,7 +390,7 @@ def main():
                 print("#No Result")
             else:
                 with open(args.output,'w') as output_file:
-                    output_file.write("Sequence ID\tSequence Length\tmotif\tstart\tend\tstrand\tmismatches\tprediction sequence\n")
+                    output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\n")
                     for result in all_results:
                         output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\n")
         if args.variable:
@@ -414,7 +420,7 @@ def main():
                 print("# No Result")
             else:
                 with open(args.output, 'w') as output_file:
-                    output_file.write("Sequence ID\tSequence  Length\tMotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatches\tgap_length\tprediction sequence\n")
+                    output_file.write("Sequence_ID\tSequence_Length\tMotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatches\tgap_length\tmatched_sequence\n")
                     for result in all_results:
                         output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['motif1_mismatch']}\t{result['fragment1']}\t{result['motif2_mismatch']}\t{result['fragment2']}\t{result['mismatch']}\t{result['gap_length']}\t{result['sequence']}\n")
 
@@ -422,8 +428,66 @@ def main():
             plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
 
     if args.VisualMotif:
-	    plot_motifs_to_single_chart(args.table_file, args.output, args.display_both_directions)
+        plot_motifs_to_single_chart(args.table_file, args.output, args.display_both_directions)
 
+    if args.extract_sequences:
+        # Read FNA file and create a dictionary of sequences
+        sequences = SeqIO.to_dict(SeqIO.parse(args.fna, "fasta"))
+
+        # Open output file for writing
+        output_handle = open(args.output, "w")
+
+        # Process GFF file
+        with open(args.gff, "r") as gff_handle:
+            for line in gff_handle:
+                line = line.strip()
+                if line.startswith("#"):
+                    continue
+
+                fields = line.split("\t")
+                feature_type = fields[2]
+                strand = fields[6]
+
+                if feature_type == "CDS":
+                    seq_name = fields[0]
+                    seq_start = int(fields[3])
+                    seq_end = int(fields[4])
+                    attributes = fields[8].split(";")
+                    cds_id = parent = gene = product = "None"
+
+                    for attr in attributes:
+                        if attr.startswith("ID="):
+                            cds_id = attr[3:]
+                        elif attr.startswith("Parent="):
+                            parent = attr[7:]
+                        elif attr.startswith("gene="):
+                            gene = attr[5:]
+                        elif attr.startswith("product="):
+                            product = attr[8:]
+
+                    if seq_name in sequences:
+                        sequence = sequences[seq_name].seq
+                        if args.promoter:
+                            if strand == "-":
+                                start = max(seq_end - args.downstream, 0)
+                                end = start + args.upstream + args.downstream
+                                seq_fragment = sequence[start:end].reverse_complement()
+                            else:
+                                start = max(seq_start - args.upstream, 0)
+                                end = start + args.upstream + args.downstream
+                                seq_fragment = sequence[start:end]
+                        elif args.orf:
+                            if strand == "-":
+                                seq_fragment = sequence[seq_start - 1:seq_end].reverse_complement()
+                            else:
+                                seq_fragment = sequence[seq_start - 1:seq_end]
+                        else:
+                            continue
+
+                        seq_record = SeqRecord(seq_fragment, id=f"{seq_name}|{cds_id}|{parent}|{gene}|{seq_start}|{seq_end}|{strand}|{product}",description="")
+                        SeqIO.write(seq_record, output_handle, "fasta")
+
+        # Close output file
+        output_handle.close()
 if __name__ == "__main__":
     main()
-
