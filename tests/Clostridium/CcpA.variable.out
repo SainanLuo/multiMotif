@@ -1,4 +1,4 @@
-Sequence ID	Sequence  Length	Motif	start	end	strand	motif1_mismatch	fragment1	motif2_mismatch	fragment2	mismatches	gap_length	prediction sequence
+Sequence_ID	Sequence_Length	Motif	start	end	strand	motif1_mismatch	fragment1	motif2_mismatch	fragment2	mismatches	gap_length	matched_sequence
 AE001437.1|cds-AAK78187.1|gene-CA_C0205|None|229452|231410|-|Predicted	400	TGTAAA,TTTACA	271	310	+	0	TGTAAA	0	TTTACA	0	28	TGTAAAAAGTAAGTTAATTCTATGTTATGTATTTTTTACA
 AE001437.1|cds-AAK78187.1|gene-CA_C0205|None|229452|231410|-|Predicted	400	TGTAAA,TTTACA	271	320	+	0	TGTAAA	0	TTTACA	0	38	TGTAAAAAGTAAGTTAATTCTATGTTATGTATTTTTTACAAAAATTTACA
 AE001437.1|cds-AAK78188.1|gene-CA_C0206|None|231611|232804|+|Uncharacterized	400	TGTAAA,TTTACA	278	327	+	0	TGTAAA	0	TTTACA	0	38	TGTAAATTTTTGTAAAAAATACATAACATAGAATTAACTTACTTTTTACA

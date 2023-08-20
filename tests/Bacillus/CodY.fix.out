@@ -1,4 +1,4 @@
-Sequence ID	Sequence Length	motif	start	end	strand	mismatches	prediction sequence
+Sequence_ID	Sequence_Length	motif	start	end	strand	mismatches	matched_sequence
 AL009126.3|cds-CAB11903.1|gene-BSU_01270|rplX|140857|141168|+|ribosomal	400	AATTTTCWGAAAATT	320	334	+	2	AACTTTATGAAAATT
 AL009126.3|cds-CAB11903.1|gene-BSU_01270|rplX|140857|141168|+|ribosomal	400	AATTTTCWGAAAATT	320	334	-	2	AATTTTCATAAAGTT
 AL009126.3|cds-CAB11926.1|gene-BSU_01500|rpsI|154300|154692|+|ribosomal	400	AATTTTCWGAAAATT	294	308	+	2	AATGTTCAAAAAATT
