@@ -17,10 +17,14 @@ git clone https://github.com/Luo-Sainan/VariaMotif.git
 cd VariaMotif
 pip install .
 ```
+
 If you are a Windows user, make sure you installed [Python3](https://www.python.org/downloads/), then run this command in your `cmd` or `PowerShell`:
 
 ```
-pip install variamotif
+C:\Users\lsn> set PATH=C:\Users\lsn\AppData\Local\Programs\Python\Python311 #set your Python path in cmd window
+C:\Users\lsn> set PATH=C:\Users\lsn\AppData\Local\Programs\Python\Python311\Scripts #set your pip path in cmd window
+C:\Users\lsn> pip install variamotif
+C:\Users\lsn> variamotif -h
 ```
 
 ## Dependencies
@@ -44,14 +48,30 @@ After installation, you can use the `variamotif` command to run VariaMotif. Here
 ```
 variamotif -h
 
-usage: variamotif [-h] [-VariaMotif] [-f FASTA] [-motif1 MOTIF1] [-motif2 MOTIF2] [-min_g MIN_GAP] [-max_g MAX_GAP]
-                  [-m MISMATCHES] [-d {+,-,+,-}] [-fix] [-variable] [-DNA] [-RNA] [-protein] [-o OUTPUT] [-VisualMotif]
-                  [-i] [-r] [-t TABLE_FILE]
+usage: VariaMotif.py [-h] [-extract_sequences] [-fna FNA] [-gff GFF]
+                     [-up UPSTREAM] [-down DOWNSTREAM] [--promoter] [--orf]
+                     [-VariaMotif] [-f FASTA] [-motif1 MOTIF1]
+                     [-motif2 MOTIF2] [-min_g MIN_GAP] [-max_g MAX_GAP]
+                     [-m MISMATCHES] [-d {+,-,+,-}] [-fix] [-variable] [-DNA]
+                     [-RNA] [-protein] [-o OUTPUT] [-VisualMotif] [-i] [-r]
+                     [-t TABLE_FILE]
 
 VariaMotif for motif scanning
 
 optional arguments:
   -h, --help            show this help message and exit
+  -extract_sequences, --extract_sequences
+                        extract promoter or orf sequences
+  -fna FNA, --fna FNA   Input FNA file
+  -gff GFF, --gff GFF   Input GFF file
+  -up UPSTREAM, --upstream UPSTREAM
+                        Gene start location upstream length (optional, default
+                        is 400)
+  -down DOWNSTREAM, --downstream DOWNSTREAM
+                        Gene start location downstream length (optional,
+                        default is 0)
+  --promoter            Extract promoters
+  --orf                 Extract ORFs
   -VariaMotif, --VariaMotif
                         motif scanning
   -f FASTA, --fasta FASTA
@@ -72,7 +92,8 @@ optional arguments:
   -RNA                  For RNA variable motif
   -protein              For protein variable motif
   -o OUTPUT, --output OUTPUT
-                        Output file for motif scanning result and Output file prefix for display
+                        Output file for motif scanning result and Output file
+                        prefix for display
   -VisualMotif, --VisualMotif
                         Display motif in sequence
   -i, --image           Display motif in sequence
@@ -129,38 +150,18 @@ variamotif -VisualMotif -t many_files.txt -o multi -r
 
 This utility can be used to extract either promoter sequences or open reading frames (ORFs) from a given genomic sequence. It takes as input a FASTA file containing the genomic sequence and a GFF file containing the gene annotations. Users can specify the desired upstream and downstream lengths relative to the start of each gene.
 
-Usage:
-
-```
-$ perl get_promoter_or_orf.pl [options]
-```
-
-Options:
-
-```
--f, --fna <file>            Input FASTA file (required)
--g, --gff <file>            Input GFF file (required)
--up, --upstream <value>     Length of upstream region from gene start location (optional, default is 400)
--down, --downstream <value> Length of downstream region from gene start location (optional, default is 0)
--o, --output <file>         Output file (required)
---promoter                  Extract promoters
---orf                       Extract ORFs
--h                          Display this help and exit
-```
-
-Example:
 
 This example demonstrates how to extract the promoter sequences of genes from a given genomic sequence. The upstream length is set to 400 base pairs, and the downstream length is set to 0. The output is saved in a file named `GCA_000009045.1.promoter.fa`
 
 ```
-$ perl get_promoter_or_orf.pl -f GCA_000009045.1_ASM904v1_genomic.fna -g genomic.gff -up 400 -down 0 -o GCA_000009045.1.promoter.fa --promoter
+variamotif -extract_sequences -fna GCA_000009045.1_ASM904v1_genomic.fna -gff genomic.gff --promoter -up 400 -down 0 -o GCA_000009045.1.promoter.fa
 ```
 
 
 ## Runtime Records
 
 CodY, genome size 4.1M, 15bp motif, both strands, 2 mismatches, runtime 12 seconds.
-CcpA, genome size 3.9M, two motifs, gap 0~40, both strands, 0 mismatches, runtime 19 seconds.
+CcpA, genome size 3.9M, two motifs, gap 0~40, both strands, 0 mismatches, runtime 13.851 seconds.
 
 ## Data Sources
 
