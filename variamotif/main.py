@@ -368,6 +368,7 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
 def main():
     args = get_args()
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
     fasta_file_path = args.fasta
     motif1 = args.motif1
     motif2 = args.motif2
@@ -381,18 +382,21 @@ def main():
         all_results = []
         if args.fix:
             if args.DNA or args.RNA:
-                for record in records:
-                    if direction == '+' or direction == '+,-':
-                        motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
-                        all_results.extend(motif1_results)
-                    if direction == '-' or direction == '+,-':
-                        motif1_results = reverse_search_fix(record, motif1, max_mismatches, len(motif1))
-                        all_results.extend(motif1_results)
+                if direction == '+' or direction == '+,-':
+                    motif1_results = pool.starmap(search_motif, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                    all_results.extend(motif1_results)
+                    
+                if direction == '-' or direction == '+,-':
+                    motif1_results = reverse_search_fix(record, motif1, max_mismatches, len(motif1))
+                    motif1_results = pool.starmap(reverse_search_fix, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                    all_results.extend(motif1_results)
 
             if args.protein:
-                for record in records:
-                    motif1_results = search_motif_protein(record, motif1, max_mismatches, len(motif1))
-                    all_results.extend(motif1_results)
+                motif1_results = pool.starmap(search_motif_protein, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                all_results.extend(motif1_results)
 
             if not all_results:
                 print("#No Result")
@@ -403,26 +407,33 @@ def main():
                         output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\n")
         if args.variable:
             if args.DNA or args.RNA:
-                for record in records:
-                    if direction == '+' or direction == '+,-':
-                        motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
-                        motif2_results = search_motif(record, motif2, max_mismatches, len(motif2))
-        
-                        combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
-                        all_results.extend(combined_results)
-			
-                    if direction == '-' or direction == '+,-':
-                        motif1_results = reverse_search(record, motif1, max_mismatches, len(motif1))
-                        motif2_results = reverse_search(record, motif2, max_mismatches, len(motif2))
-                        combined_results = combine_results_reverse(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
-                        all_results.extend(combined_results)
-            if args.protein:
-                for record in records:
-                    motif1_results = search_motif_protein(record, motif1, max_mismatches, len(motif1))
-                    motif2_results = search_motif_protein(record, motif2, max_mismatches, len(motif2))
-        
-                    combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
+
+                if direction == '+' or direction == '+,-':
+                    motif1_results = pool.starmap(search_motif, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                    motif2_results = pool.starmap(search_motif, [(record, motif2, max_mismatches, len(motif2)) for record in records])
+                    motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
+                    combined_results = pool.starmap(combine_results_forward, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
+                    combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+                    
                     all_results.extend(combined_results)
+			
+                if direction == '-' or direction == '+,-':
+                    motif1_results = pool.starmap(reverse_search, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                    motif2_results = pool.starmap(reverse_search, [(record, motif2, max_mismatches, len(motif2)) for record in records])
+                    motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
+                    combined_results = pool.starmap(combine_results_reverse, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
+                    combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+                    all_results.extend(combined_results)
+            if args.protein:
+                motif1_results = pool.starmap(search_motif_protein, [(record, motif1, max_mismatches, len(motif1)) for record in records])
+                motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                motif2_results = pool.starmap(search_motif_protein, [(record, motif2, max_mismatches, len(motif2)) for record in records])
+                motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
+                combined_results = pool.starmap(combine_results_forward, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
+                combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+                all_results.extend(combined_results)
 
             if not all_results:
                 print("# No Result")
