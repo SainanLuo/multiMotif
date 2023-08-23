@@ -11,6 +11,45 @@ from matplotlib.patches import Patch
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
+def get_args():
+    parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
+    
+    # Extract sequences arguments
+    parser.add_argument('-extract_sequences', '--extract_sequences', action="store_true", help='extract promoter or orf sequences')
+    parser.add_argument("-fna", "--fna", type=str, help="Input FNA file")
+    parser.add_argument("-gff", "--gff", type=str, help="Input GFF file")
+    parser.add_argument("-up", "--upstream", dest="upstream", type=int, default=400, help="Gene start location upstream length (optional, default is 400)")
+    parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="Gene start location downstream length (optional, default is 0)")
+    parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoters")
+    parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORFs")
+    
+    # VariaMotif arguments
+    parser.add_argument('-VariaMotif', '--VariaMotif', action="store_true", help='motif scanning')
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
+    parser.add_argument('-motif1', type=str, help='motif1', required=True)
+    parser.add_argument('-motif2', default="None", type=str, help='motif2, default="None"')
+    parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='min gap length between motif1 and motif2')
+    parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='max gap length between motif1 and motif2')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
+    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
+    parser.add_argument('-fix', action="store_true", help="For fixed length motif")
+    parser.add_argument('-variable', action="store_true", help="For variable length motif")
+    
+    # Variable motif type arguments
+    parser.add_argument('-DNA', action="store_true", help="For DNA variable motif")
+    parser.add_argument('-RNA', action="store_true", help="For RNA variable motif")
+    parser.add_argument('-protein', action="store_true", help="For protein variable motif")
+    # Output arguments
+    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
+    
+    # VisualMotif arguments
+    parser.add_argument('-VisualMotif', '--VisualMotif', action="store_true", help='Display motif in sequence')
+    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
+    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+    parser.add_argument('-t', '--table', dest='table_file', help='Input table file.')
+    
+    return parser.parse_args()
+
 #DNA
 def generate_motif_variants(motif):
     variants = []
@@ -328,38 +367,7 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
 
 def main():
-    parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
-    parser.add_argument('-extract_sequences', '--extract_sequences',action="store_true", help='extract promoter or orf sequences')
-    parser.add_argument("-fna", "--fna", type=str, help="Input FNA file")
-    parser.add_argument("-gff", "--gff", type=str, help="Input GFF file")
-    parser.add_argument("-up", "--upstream", dest="upstream", type=int, default=400, help="Gene start location upstream length (optional, default is 400)")
-    parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="Gene start location downstream length (optional, default is 0)")
-    parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoters")
-    parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORFs")
-
-    parser.add_argument('-VariaMotif', '--VariaMotif',action="store_true", help='motif scanning')
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
-    parser.add_argument('-motif1', type=str, help='motif1,required=True')
-    parser.add_argument('-motif2', default="None", type=str, help='motif2,default="None"')
-    parser.add_argument('-min_g', '--min_gap',default=0, type=int, help='mix gap length between motif1 and motif2')
-    parser.add_argument('-max_g', '--max_gap', default=50,type=int, help='max gap length between motif1 and motif2')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
-    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    parser.add_argument('-fix', action="store_true",help="For fixed length motif")
-    parser.add_argument('-variable', action="store_true",help="For variable length motif")
-
-    parser.add_argument('-DNA', action="store_true",help="For DNA variable motif")
-    parser.add_argument('-RNA', action="store_true",help="For RNA variable motif")
-
-    parser.add_argument('-protein', action="store_true",help="For protein variable motif")
-    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
-
-    parser.add_argument('-VisualMotif', '--VisualMotif',action="store_true", help='Display motif in sequence')
-    parser.add_argument('-i', '--image',action="store_true", help='Display motif in sequence')
-    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
-    parser.add_argument('-t', '--table', dest='table_file', help='Input table file.')
-    args = parser.parse_args()
-  
+    args = get_args()
     fasta_file_path = args.fasta
     motif1 = args.motif1
     motif2 = args.motif2
