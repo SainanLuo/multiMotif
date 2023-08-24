@@ -1,5 +1,5 @@
 # VariaMotif
- Scanning and visualization for a given variable gap motif.
+ Scanning and visualization for variable gap motifs.
 
 ## Installation
 
