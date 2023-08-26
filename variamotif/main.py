@@ -26,7 +26,7 @@ def get_args():
     # VariaMotif arguments
     parser.add_argument('-VariaMotif', '--VariaMotif', action="store_true", help='motif scanning')
     parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
-    parser.add_argument('-motif1', type=str, help='motif1', required=True)
+    parser.add_argument('-motif1', type=str, help='motif1')
     parser.add_argument('-motif2', default="None", type=str, help='motif2, default="None"')
     parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='min gap length between motif1 and motif2')
     parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='max gap length between motif1 and motif2')
@@ -209,15 +209,17 @@ def search_motif_protein(record, motif, max_mismatches, motif_length):
 
 
 #combine	
-def combine_results_forward(record, motif1_results, motif2_results,max_mismatches, min_gap, max_gap):
+def combine_results_forward(record, motif1_results_chunk, motif2_results,max_mismatches, min_gap, max_gap):
     sequence = str(record.seq)
     sequence_length = len(sequence)
     sequence_id = record.id
     combined_results = []
     
-    for motif1_result in motif1_results:
+    for motif1_result in motif1_results_chunk:
         for motif2_result in motif2_results:
             gap_length = motif2_result['start'] - motif1_result['end'] - 1
+            if gap_length > max_gap:
+                break
             if motif1_result['end'] < motif2_result['start'] and motif1_result['mismatches'] + motif2_result['mismatches'] <= max_mismatches and min_gap <= gap_length <= max_gap:
                 combined_result = {
                     'sequence_id': sequence_id,
@@ -238,15 +240,17 @@ def combine_results_forward(record, motif1_results, motif2_results,max_mismatche
     
     return combined_results
 
-def combine_results_reverse(record, motif1_results, motif2_results,max_mismatches, min_gap, max_gap):
+def combine_results_reverse(record, motif1_results_chunk, motif2_results,max_mismatches, min_gap, max_gap):
     sequence = str(record.seq.reverse_complement())
     sequence_length = len(sequence)
     sequence_id = record.id
     combined_results = []
     
-    for motif1_result in motif1_results:
+    for motif1_result in motif1_results_chunk:
         for motif2_result in motif2_results:
             gap_length = motif2_result['start'] - motif1_result['end'] - 1
+            if gap_length > max_gap:
+                break
             if motif1_result['end'] < motif2_result['start'] and motif1_result['mismatches'] + motif2_result['mismatches'] <= max_mismatches and min_gap <= gap_length <= max_gap:
                 combined_result = {
                     'sequence_id': sequence_id,
@@ -364,11 +368,45 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
     output_file_png = f'{output_file}.png'
     plt.savefig(output_file_png, bbox_inches='tight',format='png')
 
+def process_record_protein(record, motif1, motif2, max_mismatches, min_gap, max_gap):
+    motif1_results = search_motif_protein(record, motif1, max_mismatches, len(motif1))
+    motif2_results_pre = search_motif_protein(record, motif2, max_mismatches, len(motif2))
+    motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
+    combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
+    return combined_results
+
+def process_record_DNA_forward(record, motif1, motif2, max_mismatches, min_gap, max_gap):
+    motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
+    motif2_results_pre = search_motif(record, motif2, max_mismatches, len(motif2))
+    motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
+    combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
+    return combined_results
+
+def process_record_DNA_reverse(record, motif1, motif2, max_mismatches, min_gap, max_gap):
+    motif1_results = reverse_search(record, motif1, max_mismatches, len(motif1))
+    motif2_results_pre = reverse_search(record, motif2, max_mismatches, len(motif2))
+    motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
+    combined_results = combine_results_reverse(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
+    return combined_results
+
+def calculate_average_length(sequence_file):
+    total_length = 0
+
+    sequence_count = 0
+    
+    for record in SeqIO.parse(sequence_file, "fasta"):  # 假设文件格式是fasta格式
+        total_length += len(record.seq)
+        sequence_count += 1
+    
+    if sequence_count == 0:
+        return 0  # Handle the case of an empty file
+    
+    average_length = total_length / sequence_count
+    return average_length
 
 
 def main():
     args = get_args()
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
     fasta_file_path = args.fasta
     motif1 = args.motif1
     motif2 = args.motif2
@@ -376,6 +414,7 @@ def main():
     min_gap = args.min_gap
     max_gap = args.max_gap
     direction = args.direction
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
 
     if args.VariaMotif:
         records = list(SeqIO.parse(fasta_file_path, "fasta"))
@@ -384,20 +423,20 @@ def main():
             if args.DNA or args.RNA:
                 if direction == '+' or direction == '+,-':
                     motif1_results = pool.starmap(search_motif, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
+                    motif1_results = [item for sublist in motif1_results for item in sublist]
                     all_results.extend(motif1_results)
-                    
                 if direction == '-' or direction == '+,-':
-                    motif1_results = reverse_search_fix(record, motif1, max_mismatches, len(motif1))
                     motif1_results = pool.starmap(reverse_search_fix, [(record, motif1, max_mismatches, len(motif1)) for record in records])
                     motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
                     all_results.extend(motif1_results)
 
+
             if args.protein:
                 motif1_results = pool.starmap(search_motif_protein, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
-                all_results.extend(motif1_results)
+                motif1_results = [item for sublist in motif1_results for item in sublist] 
+                all_results.extend(motif1_results) 
 
+  
             if not all_results:
                 print("#No Result")
             else:
@@ -408,30 +447,42 @@ def main():
         if args.variable:
             if args.DNA or args.RNA:
 
-                if direction == '+' or direction == '+,-':
-                    motif1_results = pool.starmap(search_motif, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
-                    motif2_results = pool.starmap(search_motif, [(record, motif2, max_mismatches, len(motif2)) for record in records])
-                    motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
-                    combined_results = pool.starmap(combine_results_forward, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
-                    combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
-                    
-                    all_results.extend(combined_results)
+                if calculate_average_length(fasta_file_path) > 2000:
+                    for record in records:
+                        if direction == '+' or direction == '+,-':
+                            motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
+                            motif2_results_pre = search_motif(record, motif2, max_mismatches, len(motif2))
+                            motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
+                            num_chunks = multiprocessing.cpu_count()
+                            chunk_size = max(len(motif1_results) // num_chunks,1)
+                            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]
+                            combined_results = pool.starmap(combine_results_forward, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
+                            combined_results = [item for sublist in combined_results for item in sublist]
+                            all_results.extend(combined_results)			
+                        if direction == '-' or direction == '+,-':
+                            motif1_results = reverse_search(record, motif1, max_mismatches, len(motif1))
+                            motif2_results_pre = reverse_search(record, motif2, max_mismatches, len(motif2))
+                            motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
+                            num_chunks = multiprocessing.cpu_count()
+                            chunk_size = max(len(motif1_results) // num_chunks,1)
+                            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]
+                            combined_results = pool.starmap(combine_results_reverse, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
+                            combined_results = [item for sublist in combined_results for item in sublist]
+                            all_results.extend(combined_results)
+                else:
+                    if direction == '+' or direction == '+,-':
+                        combined_results = pool.starmap(process_record_DNA_forward, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+                        combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+                        all_results.extend(combined_results)
 			
-                if direction == '-' or direction == '+,-':
-                    motif1_results = pool.starmap(reverse_search, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
-                    motif2_results = pool.starmap(reverse_search, [(record, motif2, max_mismatches, len(motif2)) for record in records])
-                    motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
-                    combined_results = pool.starmap(combine_results_reverse, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
-                    combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
-                    all_results.extend(combined_results)
+                    if direction == '-' or direction == '+,-':
+                        combined_results = pool.starmap(process_record_DNA_reverse, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+                        combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+                        all_results.extend(combined_results)               
+
+
             if args.protein:
-                motif1_results = pool.starmap(search_motif_protein, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
-                motif2_results = pool.starmap(search_motif_protein, [(record, motif2, max_mismatches, len(motif2)) for record in records])
-                motif2_results = [item for sublist in motif2_results for item in sublist] #Flatten the list
-                combined_results = pool.starmap(combine_results_forward, [(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap) for record in records])
+                combined_results = pool.starmap(process_record_protein, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
                 combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
                 all_results.extend(combined_results)
 
@@ -510,3 +561,4 @@ def main():
         output_handle.close()
 if __name__ == "__main__":
     main()
+
