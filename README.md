@@ -13,7 +13,7 @@ pip install variamotif
 Or clone the repository and then install it local:
 
 ```
-git clone https://github.com/Luo-Sainan/VariaMotif.git
+git clone https://github.com/Sienna-L/VariaMotif.git
 cd VariaMotif
 pip install .
 ```
