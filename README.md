@@ -160,10 +160,14 @@ variamotif -extract_sequences -fna GCA_000009045.1_ASM904v1_genomic.fna -gff gen
 
 ## Runtime Records
 
-CodY, genome size 4.1M, 15bp motif, both strands, 2 mismatches, runtime 12 seconds.
-CcpA, genome size 3.9M, two motifs, gap 0~40, both strands, 0 mismatches, runtime 13.851 seconds.
+CodY, genome size 4.1M, 15bp motif, both strands, 2 mismatches, runtime 9.406 seconds.
+CcpA, genome size 3.9M, two motifs, gap 0~40, both strands, 0 mismatches, runtime 7.937 seconds.
 
 ## Data Sources
 
-CcpA flexible binding site (PMID: 28119470), Genome used: GCA_000008765.1 (Clostridium acetobutylicum ATCC 824)
-CodY, fixed length motif (PMID: 18083814), GCA_000009045.1, AATTTTCWGAAAATT, Bacillus subtilis subsp. subtilis str. 168
+CcpA flexible binding site (PMID: 28119470
+        
+        ), Genome used: GCA_000008765.1 (Clostridium acetobutylicum ATCC 824)
+CodY, fixed length motif (PMID: 18083814
+        
+        ), GCA_000009045.1, AATTTTCWGAAAATT, Bacillus subtilis subsp. subtilis str. 168
