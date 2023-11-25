@@ -1,3 +1,4 @@
+from operator import itemgetter
 import argparse
 from Bio import SeqIO
 import multiprocessing
@@ -10,11 +11,12 @@ import numpy as np
 from matplotlib.patches import Patch
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
+import math
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from Bio.Seq import Seq
+from itertools import groupby
 
-def get_args():
-    parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
-    
-    # Extract sequences arguments
+def get_extract_sequences_args(parser):
     parser.add_argument('-extract_sequences', '--extract_sequences', action="store_true", help='extract promoter or orf sequences')
     parser.add_argument("-fna", "--fna", type=str, help="Input FNA file")
     parser.add_argument("-gff", "--gff", type=str, help="Input GFF file")
@@ -22,9 +24,11 @@ def get_args():
     parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="Gene start location downstream length (optional, default is 0)")
     parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoters")
     parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORFs")
-    
-    # VariaMotif arguments
-    parser.add_argument('-VariaMotif', '--VariaMotif', action="store_true", help='motif scanning')
+    parser.add_argument('-o', '--output', type=str, help='Output sequence file')
+
+
+def get_variable_args(parser):
+    parser.add_argument('-variable', '--variable', action="store_true", help='variable length motif scanning')
     parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
     parser.add_argument('-motif1', type=str, help='motif1')
     parser.add_argument('-motif2', default="None", type=str, help='motif2, default="None"')
@@ -32,27 +36,357 @@ def get_args():
     parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='max gap length between motif1 and motif2')
     parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
     parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    parser.add_argument('-fix', action="store_true", help="For fixed length motif")
-    parser.add_argument('-variable', action="store_true", help="For variable length motif")
-    
-    # Variable motif type arguments
-    parser.add_argument('-DNA', action="store_true", help="For DNA variable motif")
-    parser.add_argument('-RNA', action="store_true", help="For RNA variable motif")
-    parser.add_argument('-protein', action="store_true", help="For protein variable motif")
-    # Output arguments
-    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
-    
-    # VisualMotif arguments
-    parser.add_argument('-VisualMotif', '--VisualMotif', action="store_true", help='Display motif in sequence')
     parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
     parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
-    parser.add_argument('-t', '--table', dest='table_file', help='Input table file.')
-    
-    return parser.parse_args()
 
-#DNA
+    # Variable motif type arguments
+    motif_group = parser.add_argument_group("Variable Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
+    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
+    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+
+    # Output arguments
+    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
+
+def get_fix_args(parser):
+    parser.add_argument('-fix', '--fix', action="store_true", help='fixed length motif scanning')
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
+    parser.add_argument('-motif', type=str, help='motif')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
+    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
+    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
+    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+
+    # Variable motif type arguments
+    motif_group = parser.add_argument_group("Variable Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
+    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
+    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+
+    # Output arguments
+    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
+
+def get_VisualMotif_args(parser):
+    parser.add_argument('-VisualMotif','--VisualMotif', action="store_true", help='Display motif in sequence')
+    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+    parser.add_argument('-t', '--table', dest='table_file', help='Input table file.')
+    parser.add_argument('-o', '--output', type=str, help='Output sequence file')
+
+def get_manyMotifs_args(parser):
+    parser.add_argument('-manyMotifs','--manyMotifs', action="store_true", help='manyMotifs scanning')
+    parser.add_argument('-l', '--motiflist', type=str, help='A file for motifs with sorted')
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
+    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
+    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
+    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+
+    # Variable motif type arguments
+    motif_group = parser.add_argument_group("Variable Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
+    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
+    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+
+def get_args():
+    parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
+
+    # Create subparsers
+    subparsers = parser.add_subparsers(help='sub-command help')
+
+    # Subparser for extract_sequences
+    extract_sequences_parser = subparsers.add_parser('extract_sequences', help='extract promoter or orf sequences')
+    get_extract_sequences_args(extract_sequences_parser)
+    extract_sequences_parser.set_defaults(func=extract_sequences_function)
+
+    # Subparser for variable
+    variable_parser = subparsers.add_parser('variable', help='variable length motif scanning')
+    get_variable_args(variable_parser)
+    variable_parser.set_defaults(func=variable_function)
+	
+    # Subparser for fix
+    fix_parser = subparsers.add_parser('fix', help='fixed length motif scanning')
+    get_fix_args(fix_parser)
+    fix_parser.set_defaults(func=fix_function)
+
+    # Subparser for manyMotifs
+    manyMotifs_parser = subparsers.add_parser('manyMotifs', help='manyMotifs scanning')
+    get_manyMotifs_args(manyMotifs_parser)
+    manyMotifs_parser.set_defaults(func=manyMotifs_function)
+
+    # Subparser for VisualMotif
+    VisualMotif_parser = subparsers.add_parser('VisualMotif', help='Display motif in sequence')
+    get_VisualMotif_args(VisualMotif_parser)
+    VisualMotif_parser.set_defaults(func=VisualMotif_function)
+
+    # Parse the command line arguments
+    args = parser.parse_args()
+
+    # Call the appropriate function based on the subparser
+    if hasattr(args, 'func'):
+        args.func(args)
+    else:
+        # If no subcommand is provided, print the help message
+        parser.print_help()
+    
+
+def extract_sequences_function(args):
+    if args.output is None:
+        raise ValueError("Output file path is required.")
+    sequences = SeqIO.to_dict(SeqIO.parse(args.fna, "fasta"))
+    # Open output file for writing
+    output_handle = open(args.output, "w")
+    # Process GFF file
+    with open(args.gff, "r") as gff_handle:
+        for line in gff_handle:
+            line = line.strip()
+            if line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            feature_type = fields[2]
+            strand = fields[6]
+            if feature_type == "CDS":
+                seq_name = fields[0]
+                seq_start = int(fields[3])
+                seq_end = int(fields[4])
+                attributes = fields[8].split(";")
+                cds_id = parent = gene = product = "None"
+
+                for attr in attributes:
+                    if attr.startswith("ID="):
+                        cds_id = attr[3:]
+                    elif attr.startswith("Parent="):
+                        parent = attr[7:]
+                    elif attr.startswith("gene="):
+                        gene = attr[5:]
+                    elif attr.startswith("product="):
+                        product = attr[8:]
+                if seq_name in sequences:
+                    sequence = sequences[seq_name].seq
+                    if args.promoter:
+                        if strand == "-":
+                            start = max(seq_end - args.downstream, 0)
+                            end = start + args.upstream + args.downstream
+                            seq_fragment = sequence[start:end].reverse_complement()
+                        else:
+                            start = max(seq_start - args.upstream, 0)
+                            end = start + args.upstream + args.downstream
+                            seq_fragment = sequence[start:end]
+                    elif args.orf:
+                        if strand == "-":
+                            seq_fragment = sequence[seq_start - 1:seq_end].reverse_complement()
+                        else:
+                            seq_fragment = sequence[seq_start - 1:seq_end]
+                    else:
+                        continue
+                    seq_record = SeqRecord(seq_fragment, id=f"{seq_name}|{cds_id}|{parent}|{gene}|{seq_start}|{seq_end}|{strand}|{product}",description="")
+                    SeqIO.write(seq_record, output_handle, "fasta")
+    # Close output file
+    output_handle.close()
+
+def fix_function(args):
+    fasta_file_path = args.fasta
+    motif = args.motif
+    max_mismatches = args.mismatches
+    direction = args.direction
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    records = list(SeqIO.parse(fasta_file_path, "fasta"))
+    all_results = []
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 500000:
+        if direction == '+' or direction == '+,-':  
+            motif_results_pre = process_genome_file_forward(fasta_file_path, motif, max_mismatches)
+            all_results.extend(motif_results_pre)
+        if direction == '-' or direction == '+,-':  
+            motif_results_pre = process_genome_file_reverse(fasta_file_path, motif, max_mismatches)
+            all_results.extend(motif_results_pre)
+        all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
+        if direction == '+' or direction == '+,-':
+            motif_results = pool.starmap(search_motif, [(record, motif, max_mismatches, len(motif)) for record in records])
+            motif_results = [item for sublist in motif_results for item in sublist]
+            all_results.extend(motif_results)
+        if direction == '-' or direction == '+,-':
+            motif_results = pool.starmap(reverse_search_fix, [(record, motif, max_mismatches, len(motif)) for record in records])
+            motif_results = [item for sublist in motif_results for item in sublist] #Flatten the list
+            all_results.extend(motif_results)
+        all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
+    if args.protein:
+        motif_results = pool.starmap(search_motif_protein, [(record, motif, max_mismatches, len(motif)) for record in records])
+        motif_results = [item for sublist in motif_results for item in sublist] 
+        all_results.extend(motif_results)
+        all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
+    if not all_results:
+        print("#No Result")
+    else:
+        with open(args.output,'w') as output_file:
+            output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\n")
+            for result in all_results:
+                output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\n")
+    if args.image:
+        plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
+
+
+def manyMotifs_function(args):
+    fasta_file_path = args.fasta
+    motiflist = args.motiflist
+    max_mismatches = args.mismatches
+    direction = args.direction
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    records = list(SeqIO.parse(fasta_file_path, "fasta"))
+    all_results = []
+    output_file_path1 = 'manymotifs_list.out'
+    output_file_path2 = 'manymotifs_statistics.out'
+    
+    with open(motiflist, 'r') as file:
+        line_count = sum(1 for line in file)
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 500000:
+        with open(motiflist, 'r') as file:
+            for line_number, line in enumerate(file, start=1):
+                motif = line 
+                if direction == '+' or direction == '+,-':  
+                    motif_results_pre = process_genome_file_forward(fasta_file_path, motif, max_mismatches)
+                    for result in motif_results_pre:
+                        result['motif_type'] = line_number
+                    all_results.extend(motif_results_pre)
+                if direction == '-' or direction == '+,-':
+                    motif_results_pre = process_genome_file_reverse(fasta_file_path, motif, max_mismatches)
+                    for result in motif_results_pre:
+                        result['motif_type'] = line_number
+                    all_results.extend(motif_results_pre)
+        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
+        with open(motiflist, 'r') as file:
+            for line_number, line in enumerate(file, start=1):
+                motif = line
+                if direction == '+' or direction == '+,-':
+                    motif_results = pool.starmap(search_motif, [(record, motif, max_mismatches, len(motif)) for record in records])
+                    motif_results = [item for sublist in motif_results for item in sublist]
+                    for result in motif_results_pre:
+                        result['motif_type'] = line
+                    all_results.extend(motif_results)
+                if direction == '-' or direction == '+,-':
+                    motif_results = pool.starmap(reverse_search_fix, [(record, motif, max_mismatches, len(motif)) for record in records])
+                    motif_results = [item for sublist in motif_results for item in sublist] #Flatten the list
+                    for result in motif_results_pre:
+                        result['motif_type'] = line
+                    all_results.extend(motif_results)
+        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+    if args.protein:
+        with open(motiflist, 'r') as file:
+            for line_number, line in enumerate(file, start=1):
+                motif = line.strip()
+                motif_results = pool.starmap(search_motif_protein, [(record, motif, max_mismatches, len(motif)) for record in records])
+                motif_results = [item for sublist in motif_results for item in sublist]
+                for result in motif_results:
+                    result['motif_type'] = str(line_number)
+                all_results.extend(motif_results)
+        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+    if not all_results:
+        print("#No Result")
+    else:
+        with open(output_file_path1,'w') as output_file:
+            output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\tmotif_type\n")
+            for result in all_results:
+                output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\t{result['motif_type']}\n")
+
+    filtered_results = []
+    seen_positions = set()
+    unique_positions = set()
+
+    for result in all_results:
+        key = (result['sequence_id'], result['start'], result['motif_type'])
+    
+        if key not in seen_positions and result['strand'] == '+':
+            seen_positions.add(key)
+            filtered_results.append(result)
+        elif key not in seen_positions:
+            unique_positions.add(key)
+            filtered_results.append(result)
+
+    manyMotifs_results = []
+    filtered_results_sorted = sorted(filtered_results, key=lambda x: (x['sequence_id'], x['start']))
+    grouped_results = groupby(filtered_results_sorted, key=lambda x: x['sequence_id']) #'groupby'函数返回的是一个迭代器，每个元素都是在迭代时动态计算的。因此它返回的对象无法直接序列化。
+    grouped_results_list = [(key,list(group)) for key, group in grouped_results]
+    manyMotifs_results_pre1 = pool.starmap(filter_rows, [(group, line_count) for key, group in grouped_results_list])
+    manyMotifs_results_pre2 = [item for sublist in manyMotifs_results_pre1 for item in sublist]
+    manyMotifs_results.extend(manyMotifs_results_pre2)
+    manyMotifs_results = sorted(manyMotifs_results, key=lambda x: x['sequence_id'])
+    
+    if not manyMotifs_results:
+        print("#No Result")
+    else:
+        with open(output_file_path2,'w') as output_file:
+            output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\tmotif_type\n")
+            for result in manyMotifs_results:
+                output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\t{result['motif_type']}\n")
+
+    if args.image:
+        plot_motifs_to_single_chart(output_file_path2, output_file_path2, display_both_directions=args.display_both_directions)
+
+def variable_function(args):
+    fasta_file_path = args.fasta
+    motif1 = args.motif1
+    motif2 = args.motif2
+    max_mismatches = args.mismatches
+    min_gap = args.min_gap
+    max_gap = args.max_gap
+    direction = args.direction
+    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    records = list(SeqIO.parse(fasta_file_path, "fasta"))
+    all_results = []
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 5000:
+        if direction == '+' or direction == '+,-':  
+            motif1_results_pre = process_genome_file_forward(fasta_file_path, motif1, max_mismatches, mmmm)
+            motif1_results = sorted(motif1_results_pre, key=lambda x: (x['seq_name'], x['start']))
+            motif2_results_pre = process_genome_file_forward(fasta_file_path, motif2, max_mismatches, mmmm)
+            motif2_results = sorted(motif2_results_pre, key=lambda x: (x['seq_name'], x['start']))
+            num_chunks = multiprocessing.cpu_count()
+            chunk_size = max(len(motif1_results) // num_chunks,1)
+            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]
+                
+            for record in records:
+                combined_results = pool.starmap(combine_results_forward, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
+                combined_results = [item for sublist in combined_results for item in sublist]
+                all_results.extend(combined_results)		                   
+        if direction == '-' or direction == '+,-':  
+            motif1_results_pre = process_genome_file_reverse(fasta_file_path, motif1, max_mismatches, mmmm)
+            motif1_results = sorted(motif1_results_pre, key=lambda x: (x['seq_name'], x['start']))
+            motif2_results_pre = process_genome_file_reverse(fasta_file_path, motif2, max_mismatches, mmmm)
+            motif2_results = sorted(motif2_results_pre, key=lambda x: (x['seq_name'], x['start']))
+            num_chunks = multiprocessing.cpu_count()
+            chunk_size = max(len(motif1_results) // num_chunks,1)
+            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]             
+            for record in records:
+                combined_results = pool.starmap(combine_results_reverse, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
+                combined_results = [item for sublist in combined_results for item in sublist]
+                all_results.extend(combined_results)
+    if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
+        if direction == '+' or direction == '+,-':
+            combined_results = pool.starmap(process_record_DNA_forward, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+            combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+            all_results.extend(combined_results)
+        if direction == '-' or direction == '+,-':
+            combined_results = pool.starmap(process_record_DNA_reverse, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+            combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+            all_results.extend(combined_results)
+    if args.protein:
+        combined_results = pool.starmap(process_record_protein, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+        combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
+        all_results.extend(combined_results)
+    if not all_results:
+        print("# No Result")
+    else:
+        with open(args.output, 'w') as output_file:
+            output_file.write("Sequence_ID\tSequence_Length\tMotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatches\tgap_length\tmatched_sequence\n")
+            for result in all_results:
+                output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['motif1_mismatch']}\t{result['fragment1']}\t{result['motif2_mismatch']}\t{result['fragment2']}\t{result['mismatch']}\t{result['gap_length']}\t{result['sequence']}\n")
+    if args.image:
+        plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
+
+def VisualMotif_function(args):
+    plot_motifs_to_single_chart(args.table_file, args.output, args.display_both_directions)
+
 def generate_motif_variants(motif):
-    variants = []
+    variant_bases = []
     ambiguous_bases = {
         'W': 'AT',
         'S': 'GC',
@@ -66,33 +400,22 @@ def generate_motif_variants(motif):
         'V': 'ACG',
         'N': 'ACGT'
     }
-    variant_bases = []
-    motif_variants = []
-
     for base in motif:
         if base in ambiguous_bases:
-            variant_bases.append(list(ambiguous_bases[base]))
+            variant_bases.append(set(ambiguous_bases[base]))
         else:
-            variant_bases.append([base])
+            variant_bases.append({base})
+    return variant_bases
 
-    motif_variants = product(*variant_bases)
-
-    for variant in motif_variants:
-        variants.append(''.join(variant))
-
-    return variants
-
-def calculate_mismatches(fragment, variants):
-    mismatches_list = []
-
-    for variant in variants:
-        mismatches = 0
-        for base, variant_base in zip(fragment, variant):
-            if variant_base not in base:
+def calculate_mismatches(fragment, variant_bases):
+    mismatches = 0
+    for base, variant_base in zip(fragment, variant_bases):
+        if isinstance(variant_base, set):
+            if base not in variant_base:
                 mismatches += 1
-        mismatches_list.append(mismatches)
-
-    return min(mismatches_list)
+        elif base != variant_base:
+            mismatches += 1
+    return mismatches
 
 
 def search_motif(record, motif, max_mismatches, motif_length):
@@ -176,7 +499,7 @@ def reverse_search_fix(record, motif, max_mismatches, motif_length):
 def calculate_mismatche_protein(fragment, motif):
     mismatches = 0
     for aa, motif_aa in zip(fragment, motif):
-        if motif_aa == 'X':  # Wildcard symbol, any amino acid is allowed
+        if motif_aa == '-':  # Wildcard symbol, any amino acid is allowed
             continue
         if motif_aa != aa:
             mismatches += 1
@@ -207,6 +530,119 @@ def search_motif_protein(record, motif, max_mismatches, motif_length):
 
     return results
 
+def process_window_forward(sequence_chunk, start, window_size, sequence_id, motif, max_mismatches, len_genome):
+    variants = generate_motif_variants(motif)
+    sequence_length = len(sequence_chunk)
+    results = []
+    for i in range(sequence_length - window_size + 1):
+        fragment = sequence_chunk[i:i + window_size]
+        mismatches = calculate_mismatches(fragment, variants)
+        if mismatches <= max_mismatches:
+            result = {
+                'motif':motif,
+                'sequence_length':len_genome,
+                'sequence_id':sequence_id,
+                'start':start + i,
+                'end':start + i + window_size - 1,
+                'mismatches':mismatches,
+                'fragment':fragment,
+                'strand':'+',
+            }
+            results.append(result)
+    return results
+
+def process_window_reverse(sequence_chunk, start, window_size, sequence_id, motif, max_mismatches, len_genome):
+    variants = generate_motif_variants(motif)
+    sequence_length = len(sequence_chunk)
+    results = []
+    for i in range(sequence_length - window_size + 1):
+        fragment = sequence_chunk[i:i + window_size]
+        mismatches = calculate_mismatches(fragment, variants)
+        if mismatches <= max_mismatches:
+            result = {
+                'motif':motif,
+                'sequence_length':len_genome,
+                'sequence_id':sequence_id,
+                'start':len_genome - (start + i) - window_size,
+                'end':len_genome - (start + i) - 1,
+                'mismatches':mismatches,
+                'fragment':fragment,
+                'strand':'-',
+            }
+            results.append(result)
+    return results
+
+
+def process_genome_file_forward(fasta_file_path, motif, max_mismatches):
+    window_size = len(motif)
+    split_size = 500000
+    all_results = []
+    futures = []
+    with ProcessPoolExecutor() as executor:
+        for record in SeqIO.parse(fasta_file_path, "fasta"):
+            sequence_id = record.id
+            genome_sequence = str(record.seq)
+            len_genome = len(genome_sequence)
+            if len_genome <= split_size:
+                # 如果序列长度小于等于split_size，直接滑窗
+                sequence_chunk = genome_sequence
+                start = 0
+                future = executor.submit(process_window_forward, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                futures.append(future)
+                
+            else:
+                num_splits = math.ceil(len_genome / split_size)
+                for i in range(num_splits):
+                    start = i * split_size
+                    end = start + split_size + window_size - 1
+                    sequence_chunk = genome_sequence[start:end]
+                    if i == num_splits - 1 and len(sequence_chunk) < split_size:
+                        # 如果是最后一个片段且长度小于split_size，传递实际长度
+                        future = executor.submit(process_window_forward, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                    else:
+                        # 否则传递split_size
+                        future = executor.submit(process_window_forward, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                    futures.append(future)
+                    
+        for future in as_completed(futures):
+            results = future.result()
+            all_results.extend(results)
+    return all_results
+
+def process_genome_file_reverse(fasta_file_path, motif, max_mismatches):
+    window_size = len(motif)
+    split_size = 500000
+    all_results = []
+    futures = []
+    with ProcessPoolExecutor() as executor:
+        for record in SeqIO.parse(fasta_file_path, "fasta"):
+            sequence_id = record.id
+            genome_sequence = str(record.seq.reverse_complement())
+            len_genome = len(genome_sequence)
+            if len_genome <= split_size:
+                # 如果序列长度小于等于split_size，直接滑窗
+                sequence_chunk = genome_sequence
+                start = 0
+                future = executor.submit(process_window_reverse, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                futures.append(future)
+            else:
+                num_splits = math.ceil(len_genome / split_size)
+                for i in range(num_splits):
+                    start = i * split_size
+                    end = start + split_size + window_size - 1
+                    sequence_chunk = genome_sequence[start:end]
+                    if i == num_splits - 1 and len(sequence_chunk) < split_size:
+                        # 如果是最后一个片段且长度小于split_size，传递实际长度
+                        future = executor.submit(process_window_reverse, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                    else:
+                        # 否则传递split_size
+                        future = executor.submit(process_window_reverse, sequence_chunk, start, window_size, sequence_id, motif, max_mismatches,len_genome)
+                    futures.append(future)
+                    
+        for future in as_completed(futures):
+            results = future.result()
+            all_results.extend(results)			  
+    return all_results
 
 #combine	
 def combine_results_forward(record, motif1_results_chunk, motif2_results,max_mismatches, min_gap, max_gap):
@@ -270,6 +706,9 @@ def combine_results_reverse(record, motif1_results_chunk, motif2_results,max_mis
                 combined_results.append(combined_result)
     
     return combined_results
+
+
+
 
 def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=False):
     df = pd.read_csv(file_path, sep='\t', header=None, dtype={0: str, 1: int, 2: str, 3: int, 4: int, 5: str}, usecols=[0, 1, 2, 3, 4, 5], skiprows=1, names=["Sequence ID", "Length", "Motif", "Start", "End", "Strand"])
@@ -348,7 +787,6 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
         ax.text(tick_pos, y_pos - 1.2 , str(tick_label), ha='center', va='bottom', fontsize=10)
 
 
-
     ax.set_xlim(0, line_length) 
     ax.set_ylim(-1, num_sequences * 2)
     ax.set_xticks(np.arange(0, line_length + 1))
@@ -404,161 +842,54 @@ def calculate_average_length(sequence_file):
     average_length = total_length / sequence_count
     return average_length
 
+def filter_rows(result_list,line_count):
+    if len(set(row['motif_type'] for row in result_list)) < line_count:
+        return
 
-def main():
-    args = get_args()
-    fasta_file_path = args.fasta
-    motif1 = args.motif1
-    motif2 = args.motif2
-    max_mismatches = args.mismatches
-    min_gap = args.min_gap
-    max_gap = args.max_gap
-    direction = args.direction
-    pool = multiprocessing.Pool(multiprocessing.cpu_count())
+    filtered_rows = []
+    motif_type = []
+    i = 0
+    while i <= len(result_list) - 1:
+        current_row = result_list[i]
+        after_row = result_list[i + 1] if i + 1 < len(result_list) else None
+        before_row = result_list[i - 1] if i - 1 >= 0 else None
 
-    if args.VariaMotif:
-        records = list(SeqIO.parse(fasta_file_path, "fasta"))
-        all_results = []
-        if args.fix:
-            if args.DNA or args.RNA:
-                if direction == '+' or direction == '+,-':
-                    motif1_results = pool.starmap(search_motif, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                    motif1_results = [item for sublist in motif1_results for item in sublist]
-                    all_results.extend(motif1_results)
-                if direction == '-' or direction == '+,-':
-                    motif1_results = pool.starmap(reverse_search_fix, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                    motif1_results = [item for sublist in motif1_results for item in sublist] #Flatten the list
-                    all_results.extend(motif1_results)
+        if i == 0 and int(current_row['motif_type']) == 1:
+            m=0
+            while int(result_list[m]['motif_type']) == 1:
+                m += 1
+            i = m - 1
+            filtered_rows.append(result_list[i])
+            motif_type.append(result_list[m]['motif_type'])
+            i += 1
+        # 检查数值和位置的条件
 
-
-            if args.protein:
-                motif1_results = pool.starmap(search_motif_protein, [(record, motif1, max_mismatches, len(motif1)) for record in records])
-                motif1_results = [item for sublist in motif1_results for item in sublist] 
-                all_results.extend(motif1_results) 
-
-  
-            if not all_results:
-                print("#No Result")
+        elif after_row is not None and before_row is not None and 'motif_type' in current_row and 'motif_type' in after_row and current_row['motif_type'] < after_row['motif_type'] and current_row['end'] < after_row['start'] and current_row['start'] > before_row['end']:
+            filtered_rows.append(current_row)
+            motif_type.append(current_row['motif_type'])
+            i += 1
+        elif after_row is not None and before_row is not None and current_row['motif_type'] > after_row['motif_type'] and current_row['motif_type'] > before_row['motif_type']:
+            if after_row['motif_type'] in motif_type and current_row['start'] > before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                i += 2
+            elif after_row['motif_type'] not in motif_type and after_row['start'] > before_row['end']:
+                filtered_rows.append(after_row)
+                motif_type.append(after_row['motif_type'])
+                i += 2
             else:
-                with open(args.output,'w') as output_file:
-                    output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\n")
-                    for result in all_results:
-                        output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\n")
-        if args.variable:
-            if args.DNA or args.RNA:
+                i += 2
+        elif before_row is not None and current_row['motif_type'] == line_count and current_row['start'] > before_row['end']:
+            filtered_rows.append(current_row)
+            motif_type.append(current_row['motif_type'])
+            break
+        elif before_row is not None and i == len(result_list) -1 and current_row['start'] > before_row['end']:
+            filtered_rows.append(current_row)
+            motif_type.append(current_row['motif_type'])
+            break
+        else:
+            i += 1
+    return filtered_rows
 
-                if calculate_average_length(fasta_file_path) > 2000:
-                    for record in records:
-                        if direction == '+' or direction == '+,-':
-                            motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
-                            motif2_results_pre = search_motif(record, motif2, max_mismatches, len(motif2))
-                            motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
-                            num_chunks = multiprocessing.cpu_count()
-                            chunk_size = max(len(motif1_results) // num_chunks,1)
-                            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]
-                            combined_results = pool.starmap(combine_results_forward, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
-                            combined_results = [item for sublist in combined_results for item in sublist]
-                            all_results.extend(combined_results)			
-                        if direction == '-' or direction == '+,-':
-                            motif1_results = reverse_search(record, motif1, max_mismatches, len(motif1))
-                            motif2_results_pre = reverse_search(record, motif2, max_mismatches, len(motif2))
-                            motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
-                            num_chunks = multiprocessing.cpu_count()
-                            chunk_size = max(len(motif1_results) // num_chunks,1)
-                            chunks = [motif1_results[i:i + chunk_size] for i in range(0, len(motif1_results), chunk_size)]
-                            combined_results = pool.starmap(combine_results_reverse, [(record, motif1_results_chunk, motif2_results, max_mismatches, min_gap, max_gap) for motif1_results_chunk in chunks])
-                            combined_results = [item for sublist in combined_results for item in sublist]
-                            all_results.extend(combined_results)
-                else:
-                    if direction == '+' or direction == '+,-':
-                        combined_results = pool.starmap(process_record_DNA_forward, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
-                        combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
-                        all_results.extend(combined_results)
-			
-                    if direction == '-' or direction == '+,-':
-                        combined_results = pool.starmap(process_record_DNA_reverse, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
-                        combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
-                        all_results.extend(combined_results)               
-
-
-            if args.protein:
-                combined_results = pool.starmap(process_record_protein, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
-                combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
-                all_results.extend(combined_results)
-
-            if not all_results:
-                print("# No Result")
-            else:
-                with open(args.output, 'w') as output_file:
-                    output_file.write("Sequence_ID\tSequence_Length\tMotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatches\tgap_length\tmatched_sequence\n")
-                    for result in all_results:
-                        output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['motif1_mismatch']}\t{result['fragment1']}\t{result['motif2_mismatch']}\t{result['fragment2']}\t{result['mismatch']}\t{result['gap_length']}\t{result['sequence']}\n")
-
-        if args.image:
-            plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
-
-    if args.VisualMotif:
-        plot_motifs_to_single_chart(args.table_file, args.output, args.display_both_directions)
-
-    if args.extract_sequences:
-        # Read FNA file and create a dictionary of sequences
-        sequences = SeqIO.to_dict(SeqIO.parse(args.fna, "fasta"))
-
-        # Open output file for writing
-        output_handle = open(args.output, "w")
-
-        # Process GFF file
-        with open(args.gff, "r") as gff_handle:
-            for line in gff_handle:
-                line = line.strip()
-                if line.startswith("#"):
-                    continue
-
-                fields = line.split("\t")
-                feature_type = fields[2]
-                strand = fields[6]
-
-                if feature_type == "CDS":
-                    seq_name = fields[0]
-                    seq_start = int(fields[3])
-                    seq_end = int(fields[4])
-                    attributes = fields[8].split(";")
-                    cds_id = parent = gene = product = "None"
-
-                    for attr in attributes:
-                        if attr.startswith("ID="):
-                            cds_id = attr[3:]
-                        elif attr.startswith("Parent="):
-                            parent = attr[7:]
-                        elif attr.startswith("gene="):
-                            gene = attr[5:]
-                        elif attr.startswith("product="):
-                            product = attr[8:]
-
-                    if seq_name in sequences:
-                        sequence = sequences[seq_name].seq
-                        if args.promoter:
-                            if strand == "-":
-                                start = max(seq_end - args.downstream, 0)
-                                end = start + args.upstream + args.downstream
-                                seq_fragment = sequence[start:end].reverse_complement()
-                            else:
-                                start = max(seq_start - args.upstream, 0)
-                                end = start + args.upstream + args.downstream
-                                seq_fragment = sequence[start:end]
-                        elif args.orf:
-                            if strand == "-":
-                                seq_fragment = sequence[seq_start - 1:seq_end].reverse_complement()
-                            else:
-                                seq_fragment = sequence[seq_start - 1:seq_end]
-                        else:
-                            continue
-
-                        seq_record = SeqRecord(seq_fragment, id=f"{seq_name}|{cds_id}|{parent}|{gene}|{seq_start}|{seq_end}|{strand}|{product}",description="")
-                        SeqIO.write(seq_record, output_handle, "fasta")
-
-        # Close output file
-        output_handle.close()
 if __name__ == "__main__":
-    main()
-
+    get_args()
