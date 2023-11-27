@@ -17,75 +17,78 @@ from Bio.Seq import Seq
 from itertools import groupby
 
 def get_extract_sequences_args(parser):
-    parser.add_argument('-extract_sequences', '--extract_sequences', action="store_true", help='extract promoter or orf sequences')
-    parser.add_argument("-fna", "--fna", type=str, help="Input FNA file")
-    parser.add_argument("-gff", "--gff", type=str, help="Input GFF file")
-    parser.add_argument("-up", "--upstream", dest="upstream", type=int, default=400, help="Gene start location upstream length (optional, default is 400)")
-    parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="Gene start location downstream length (optional, default is 0)")
-    parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoters")
-    parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORFs")
+    parser.add_argument("-fna", "--fna", type=str, help="Input a FASTA file such genome sequence")
+    parser.add_argument("-gff", "--gff", type=str, help="Input a annotation file, such as a .gff")
+    parser.add_argument("-up", "--upstream", dest="upstream", type=int, default=400, help="For the promoter option: specify the upstream length from gene start location (optional, default is 400)")
+    parser.add_argument("-down", "--downstream", dest="downstream", type=int, default=0, help="For promoter option: specify the downstream length from gene start location  (optional, default is 0)")
+    parser.add_argument("--promoter", dest="promoter", action="store_true", help="Extract promoter sequences")
+    parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORF sequences")
     parser.add_argument('-o', '--output', type=str, help='Output sequence file')
 
+def get_fix_args(parser):
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
+    parser.add_argument('-motif', type=str, help='Motif sequences')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
+    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
+    
+    motif_display = parser.add_argument_group("Options for motif display")
+    motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
+    motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
+
+    # Variable motif type arguments
+    motif_group = parser.add_argument_group("Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="DNA")
+    motif_group.add_argument('-RNA', action="store_true", help="RNA")
+    motif_group.add_argument('-protein', action="store_true", help="Protein")
+
+    # Output arguments
+    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning results and file prefix for display output.')
 
 def get_variable_args(parser):
-    parser.add_argument('-variable', '--variable', action="store_true", help='variable length motif scanning')
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
     parser.add_argument('-motif1', type=str, help='motif1')
     parser.add_argument('-motif2', default="None", type=str, help='motif2, default="None"')
     parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='min gap length between motif1 and motif2')
     parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='max gap length between motif1 and motif2')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
     parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
-    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+    
+    motif_display = parser.add_argument_group("Options for motif display")
+    motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
+    motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
 
     # Variable motif type arguments
-    motif_group = parser.add_argument_group("Variable Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
-    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
-    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+    motif_group = parser.add_argument_group("Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="DNA")
+    motif_group.add_argument('-RNA', action="store_true", help="RNA")
+    motif_group.add_argument('-protein', action="store_true", help="Protein")
 
     # Output arguments
     parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
 
-def get_fix_args(parser):
-    parser.add_argument('-fix', '--fix', action="store_true", help='fixed length motif scanning')
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
-    parser.add_argument('-motif', type=str, help='motif')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
+def get_multiMotifs_args(parser):
+    parser.add_argument('-l', '--motiflist', type=str, help='A file motifs list in order')
+    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
+    parser.add_argument('-n', '--mis_motif_nums', default=0, type=int, help='Allow how many motifs could be lost')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
     parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
-    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
+    
+    motif_display = parser.add_argument_group("Options for motif display")
+    motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
+    motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
 
     # Variable motif type arguments
-    motif_group = parser.add_argument_group("Variable Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
-    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
-    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+    motif_group = parser.add_argument_group("Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="DNA")
+    motif_group.add_argument('-RNA', action="store_true", help="RNA")
+    motif_group.add_argument('-protein', action="store_true", help="Protein")
 
-    # Output arguments
-    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
+    parser.add_argument('-o', '--output_dir', type=str, help='Output directory for result files')
 
 def get_VisualMotif_args(parser):
-    parser.add_argument('-VisualMotif','--VisualMotif', action="store_true", help='Display motif in sequence')
-    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
-    parser.add_argument('-t', '--table', dest='table_file', help='Input table file.')
-    parser.add_argument('-o', '--output', type=str, help='Output sequence file')
-
-def get_manyMotifs_args(parser):
-    parser.add_argument('-manyMotifs','--manyMotifs', action="store_true", help='manyMotifs scanning')
-    parser.add_argument('-l', '--motiflist', type=str, help='A file for motifs with sorted')
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file path')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='max mismatches')
-    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    parser.add_argument('-i', '--image', action="store_true", help='Display motif in sequence')
-    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.')
-
-    # Variable motif type arguments
-    motif_group = parser.add_argument_group("Variable Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="For DNA variable motif")
-    motif_group.add_argument('-RNA', action="store_true", help="For RNA variable motif")
-    motif_group.add_argument('-protein', action="store_true", help="For protein variable motif")
+    parser.add_argument('-t', '--table', dest='table_file', help='Input table file')
+    parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
+    parser.add_argument('-o', '--output', type=str, help='Output file')
 
 def get_args():
     parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
@@ -94,27 +97,27 @@ def get_args():
     subparsers = parser.add_subparsers(help='sub-command help')
 
     # Subparser for extract_sequences
-    extract_sequences_parser = subparsers.add_parser('extract_sequences', help='extract promoter or orf sequences')
+    extract_sequences_parser = subparsers.add_parser('extract_sequences', help='Extract Sequences')
     get_extract_sequences_args(extract_sequences_parser)
     extract_sequences_parser.set_defaults(func=extract_sequences_function)
 
-    # Subparser for variable
-    variable_parser = subparsers.add_parser('variable', help='variable length motif scanning')
-    get_variable_args(variable_parser)
-    variable_parser.set_defaults(func=variable_function)
-	
     # Subparser for fix
-    fix_parser = subparsers.add_parser('fix', help='fixed length motif scanning')
+    fix_parser = subparsers.add_parser('fix', help='Scanning for fixed-length motifs')
     get_fix_args(fix_parser)
     fix_parser.set_defaults(func=fix_function)
 
+    # Subparser for variable
+    variable_parser = subparsers.add_parser('variable', help='Scanning for variable gap motifs')
+    get_variable_args(variable_parser)
+    variable_parser.set_defaults(func=variable_function)
+
     # Subparser for manyMotifs
-    manyMotifs_parser = subparsers.add_parser('manyMotifs', help='manyMotifs scanning')
-    get_manyMotifs_args(manyMotifs_parser)
-    manyMotifs_parser.set_defaults(func=manyMotifs_function)
+    multiMotifs_parser = subparsers.add_parser('multiMotifs', help='Scanning more than two ordered fixed-length motifs')
+    get_multiMotifs_args(multiMotifs_parser)
+    multiMotifs_parser.set_defaults(func=multiMotifs_function)
 
     # Subparser for VisualMotif
-    VisualMotif_parser = subparsers.add_parser('VisualMotif', help='Display motif in sequence')
+    VisualMotif_parser = subparsers.add_parser('VisualMotif', help='Visualization:display motif in sequence')
     get_VisualMotif_args(VisualMotif_parser)
     VisualMotif_parser.set_defaults(func=VisualMotif_function)
 
@@ -225,16 +228,18 @@ def fix_function(args):
         plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
 
 
-def manyMotifs_function(args):
+def multiMotifs_function(args):
     fasta_file_path = args.fasta
     motiflist = args.motiflist
     max_mismatches = args.mismatches
     direction = args.direction
+    output_dir = args.output_dir
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
     records = list(SeqIO.parse(fasta_file_path, "fasta"))
     all_results = []
-    output_file_path1 = 'manymotifs_list.out'
-    output_file_path2 = 'manymotifs_statistics.out'
+    output_file_path1 = f"{output_dir}/multiMotifs_list.out"
+    output_file_path2 = f"{output_dir}/multiMotifs_statistics.out"
+    n=args.mis_motif_nums
     
     with open(motiflist, 'r') as file:
         line_count = sum(1 for line in file)
@@ -302,11 +307,12 @@ def manyMotifs_function(args):
             unique_positions.add(key)
             filtered_results.append(result)
 
+    motif_nums = line_count - n
     manyMotifs_results = []
     filtered_results_sorted = sorted(filtered_results, key=lambda x: (x['sequence_id'], x['start']))
     grouped_results = groupby(filtered_results_sorted, key=lambda x: x['sequence_id']) #'groupby'函数返回的是一个迭代器，每个元素都是在迭代时动态计算的。因此它返回的对象无法直接序列化。
     grouped_results_list = [(key,list(group)) for key, group in grouped_results]
-    manyMotifs_results_pre1 = pool.starmap(filter_rows, [(group, line_count) for key, group in grouped_results_list])
+    manyMotifs_results_pre1 = pool.starmap(filter_rows, [(group, motif_nums) for key, group in grouped_results_list])
     manyMotifs_results_pre2 = [item for sublist in manyMotifs_results_pre1 for item in sublist]
     manyMotifs_results.extend(manyMotifs_results_pre2)
     manyMotifs_results = sorted(manyMotifs_results, key=lambda x: x['sequence_id'])
