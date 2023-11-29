@@ -897,5 +897,8 @@ def filter_rows(result_list,line_count):
             i += 1
     return filtered_rows
 
-if __name__ == "__main__":
+def main():
     get_args()
+
+if __name__ == "__main__":
+    main()
