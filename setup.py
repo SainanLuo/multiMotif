@@ -18,10 +18,10 @@ setup(
     description='A Computational Tool for Variable Motif scanning and Sequence-based Relative Position Visualization of Search Results in Sequences.',
     long_description=long_description,  # The new line
     long_description_content_type='text/markdown',  # The new line
-    url='https://github.com/Luo-Sainan/VariaMotif',
+    url='https://github.com/Sienna-L/multiMotif',
     entry_points={
         'console_scripts': [
-            'variamotif=variamotif.main:main',
+            'multimotif=multimotif.main:main',
         ],
     },
 )
