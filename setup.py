@@ -5,8 +5,8 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name='variamotif',
-    version='1.0.1',
+    name='multiMotif',
+    version='1.0.5',
     packages=find_packages(),
     install_requires=[
         'biopython>=1.78',

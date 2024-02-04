@@ -1,20 +1,17 @@
-from operator import itemgetter
 import argparse
 from Bio import SeqIO
 import multiprocessing
-from itertools import product
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # Set non-interactive backend to prevent X11 window creation
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
-from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 import math
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from Bio.Seq import Seq
 from itertools import groupby
+import csv
 
 def get_extract_sequences_args(parser):
     parser.add_argument("-fna", "--fna", type=str, help="Input a FASTA file such genome sequence")
@@ -25,53 +22,32 @@ def get_extract_sequences_args(parser):
     parser.add_argument("--orf", dest="orf", action="store_true", help="Extract ORF sequences")
     parser.add_argument('-o', '--output', type=str, help='Output sequence file')
 
-def get_fix_args(parser):
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
-    parser.add_argument('-motif', type=str, help='Motif sequences')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
-    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    
+def get_single_args(parser):
+    single = parser.add_argument_group("Option for single motif scanning")
+    single.add_argument('-f', '--fasta', type=str, help='Input FASTA file containing sequences for motif scanning')
+    single.add_argument('-motif', type=str, help='Input motif sequences')
+    single.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches motif scanning. Default is 0')
+    single.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
+    single.add_argument('-o', '--output_dir', type=str, help='Output directory for result files')
+
     motif_display = parser.add_argument_group("Options for motif display")
     motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
     motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
 
     # Variable motif type arguments
     motif_group = parser.add_argument_group("Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="DNA")
-    motif_group.add_argument('-RNA', action="store_true", help="RNA")
-    motif_group.add_argument('-protein', action="store_true", help="Protein")
+    motif_group.add_argument('-DNA', action="store_true", help="Search for DNA motifs")
+    motif_group.add_argument('-RNA', action="store_true", help="Search for RNA motifs")
+    motif_group.add_argument('-protein', action="store_true", help="Search for protein motifs")
 
-    # Output arguments
-    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning results and file prefix for display output.')
+    fimo = parser.add_argument_group("Compare with fimo result")
+    fimo.add_argument("-fimo_path", "--fimo_path", type=str, default=False, help="Path to Fimo result file (e.g., /path/to/fimo.tsv).")
 
-def get_variable_args(parser):
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
-    parser.add_argument('-motif1', type=str, help='motif1')
-    parser.add_argument('-motif2', default="None", type=str, help='motif2, default="None"')
-    parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='min gap length between motif1 and motif2')
-    parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='max gap length between motif1 and motif2')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
+def get_multiple_args(parser):
+    parser.add_argument('-l', '--motiflist', type=str, help='Input file containing motifs list in order')
+    parser.add_argument('-f', '--fasta', type=str, help='Input FASTA file containing sequences for motif scanning')
     parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
-    
-    motif_display = parser.add_argument_group("Options for motif display")
-    motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
-    motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
-
-    # Variable motif type arguments
-    motif_group = parser.add_argument_group("Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="DNA")
-    motif_group.add_argument('-RNA', action="store_true", help="RNA")
-    motif_group.add_argument('-protein', action="store_true", help="Protein")
-
-    # Output arguments
-    parser.add_argument('-o', '--output', type=str, help='Output file for motif scanning result and Output file prefix for display')
-
-def get_multiMotifs_args(parser):
-    parser.add_argument('-l', '--motiflist', type=str, help='A file motifs list in order')
-    parser.add_argument('-f', '--fasta', type=str, help='FASTA file')
     parser.add_argument('-n', '--mis_motif_nums', default=0, type=int, help='Allow how many motifs could be lost')
-    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches')
-    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')
     
     motif_display = parser.add_argument_group("Options for motif display")
     motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
@@ -79,16 +55,40 @@ def get_multiMotifs_args(parser):
 
     # Variable motif type arguments
     motif_group = parser.add_argument_group("Motif Type")
-    motif_group.add_argument('-DNA', action="store_true", help="DNA")
-    motif_group.add_argument('-RNA', action="store_true", help="RNA")
-    motif_group.add_argument('-protein', action="store_true", help="Protein")
+    motif_group.add_argument('-DNA', action="store_true", help="Search for DNA motifs")
+    motif_group.add_argument('-RNA', action="store_true", help="Search for RNA motifs")
+    motif_group.add_argument('-protein', action="store_true", help="Search for protein motifs")
 
     parser.add_argument('-o', '--output_dir', type=str, help='Output directory for result files')
+
+def get_regulator_args(parser):
+    parser.add_argument('-f', '--fasta', type=str, help='Input FASTA file containing sequences for motif scanning')
+    parser.add_argument('-motif1', type=str, help='Input motif1 sequence')
+    parser.add_argument('-m1', '--mismatch1', default=0, type=int, help='Maximum allowed mismatches for -motif1. Default is 0')
+    parser.add_argument('-motif2', default="None", type=str, help='Input motif1 sequence. Default is "None"')
+    parser.add_argument('-m2', '--mismatch2', default=0, type=int, help='Maximum allowed mismatches for -motif2. Default is 0')
+    parser.add_argument('-m', '--mismatches', default=0, type=int, help='Maximum allowed mismatches for complete motif. Default is equal to the sum of submotif mismatches.')
+    parser.add_argument('-min_g', '--min_gap', default=0, type=int, help='Minimum gap length between motif1 and motif2. Default is 0')
+    parser.add_argument('-max_g', '--max_gap', default=50, type=int, help='Maximum gap length between motif1 and motif2. Default is 50')
+    parser.add_argument('-d', '--direction', type=str, default='+', choices=['+,-', '+', '-'], help='Search direction: both, forward (default), or reverse')    
+
+    motif_display = parser.add_argument_group("Options for motif display")
+    motif_display.add_argument('-i', '--image', action="store_true", help='Display motif in sequence: Default is not to display.')
+    motif_display.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
+
+    # Variable motif type arguments
+    motif_group = parser.add_argument_group("Motif Type")
+    motif_group.add_argument('-DNA', action="store_true", help="Search for DNA motifs")
+    motif_group.add_argument('-RNA', action="store_true", help="Search for RNA motifs")
+    motif_group.add_argument('-protein', action="store_true", help="Search for protein motifs")
+
+    # Output arguments
+    parser.add_argument('-o', '--output_dir', type=str, help='Output file for motif scanning result and Output file prefix for display')
 
 def get_VisualMotif_args(parser):
     parser.add_argument('-t', '--table', dest='table_file', help='Input table file')
     parser.add_argument('-r', '--display_both_directions', action='store_true', help='Display motifs from both + and - strands.Default is the forward strand (+).')
-    parser.add_argument('-o', '--output', type=str, help='Output file')
+    parser.add_argument('-o', '--output_dir', type=str, help='Output directory for result files')
 
 def get_args():
     parser = argparse.ArgumentParser(description='VariaMotif for motif scanning')
@@ -102,19 +102,19 @@ def get_args():
     extract_sequences_parser.set_defaults(func=extract_sequences_function)
 
     # Subparser for fix
-    fix_parser = subparsers.add_parser('fix', help='Scanning for fixed-length motifs')
-    get_fix_args(fix_parser)
-    fix_parser.set_defaults(func=fix_function)
+    single_parser = subparsers.add_parser('single', help='Scanning for single motif')
+    get_single_args(single_parser)
+    single_parser.set_defaults(func=single_function)
 
     # Subparser for variable
-    variable_parser = subparsers.add_parser('variable', help='Scanning for variable gap motifs')
-    get_variable_args(variable_parser)
-    variable_parser.set_defaults(func=variable_function)
+    regulator_parser = subparsers.add_parser('regulator', help='Scanning for regultor variable gap motifs')
+    get_regulator_args(regulator_parser)
+    regulator_parser.set_defaults(func=regulator_function)
 
     # Subparser for manyMotifs
-    multiMotifs_parser = subparsers.add_parser('multiMotifs', help='Scanning more than two ordered fixed-length motifs')
-    get_multiMotifs_args(multiMotifs_parser)
-    multiMotifs_parser.set_defaults(func=multiMotifs_function)
+    multiple_parser = subparsers.add_parser('multiple', help='Scanning more than two ordered motifs')
+    get_multiple_args(multiple_parser)
+    multiple_parser.set_defaults(func=multiple_function)
 
     # Subparser for VisualMotif
     VisualMotif_parser = subparsers.add_parser('VisualMotif', help='Visualization:display motif in sequence')
@@ -186,14 +186,17 @@ def extract_sequences_function(args):
     # Close output file
     output_handle.close()
 
-def fix_function(args):
+def single_function(args):
     fasta_file_path = args.fasta
+    output_dir = args.output_dir
+    all_results = []
+    filtered_results = []
     motif = args.motif
     max_mismatches = args.mismatches
     direction = args.direction
+    output_file_path1 = f"{output_dir}/single.out"
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
     records = list(SeqIO.parse(fasta_file_path, "fasta"))
-    all_results = []
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 500000:
         if direction == '+' or direction == '+,-':  
             motif_results_pre = process_genome_file_forward(fasta_file_path, motif, max_mismatches)
@@ -202,6 +205,18 @@ def fix_function(args):
             motif_results_pre = process_genome_file_reverse(fasta_file_path, motif, max_mismatches)
             all_results.extend(motif_results_pre)
         all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
+
+        seen_positions = set()
+        unique_positions = set()
+        for result in all_results:
+            key = (result['sequence_id'], result['start'])
+            if key not in seen_positions and result['strand'] == '+':
+                seen_positions.add(key)
+                filtered_results.append(result)
+            elif key not in seen_positions:
+                unique_positions.add(key)
+                filtered_results.append(result)
+
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
         if direction == '+' or direction == '+,-':
             motif_results = pool.starmap(search_motif, [(record, motif, max_mismatches, len(motif)) for record in records])
@@ -212,41 +227,136 @@ def fix_function(args):
             motif_results = [item for sublist in motif_results for item in sublist] #Flatten the list
             all_results.extend(motif_results)
         all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
+
+        seen_positions = set()
+        unique_positions = set()
+        for result in all_results:
+            key = (result['sequence_id'], result['start'])           
+            if key not in seen_positions and result['strand'] == '+':
+                seen_positions.add(key)
+                filtered_results.append(result)
+            elif key not in seen_positions:
+                unique_positions.add(key)
+                filtered_results.append(result)
+
     if args.protein:
         motif_results = pool.starmap(search_motif_protein, [(record, motif, max_mismatches, len(motif)) for record in records])
-        motif_results = [item for sublist in motif_results for item in sublist] 
-        all_results.extend(motif_results)
-        all_results = sorted(all_results, key=lambda x: (x['sequence_id'], x['start']))
-    if not all_results:
+        motif_results = [item for sublist in motif_results for item in sublist]
+        filtered_results.extend(motif_results)
+        filtered_results = sorted(filtered_results, key=lambda x: (x['sequence_id'], x['start']))
+    if not filtered_results:
         print("#No Result")
     else:
-        with open(args.output,'w') as output_file:
+        with open(output_file_path1,'w') as output_file:
             output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\n")
-            for result in all_results:
+            for result in filtered_results:
+                result['motif']=f"single_{result['motif']}"
                 output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['mismatches']}\t{result['fragment']}\n")
     if args.image:
-        plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
+        plot_motifs_to_single_chart(output_file_path1, output_file_path1, display_both_directions=args.display_both_directions)
 
+    fimo_results=[]
+    fimo_results_filter=[]
+    if args.fimo_path:
+        output_file_path2 = f"{output_dir}/fimo.out"
+        records = list(SeqIO.parse(fasta_file_path, "fasta"))
+        file_path=args.fimo_path
+        data=[]
+        with open(file_path,'r',newline='',encoding='utf-8') as file:
+            reader=csv.DictReader(file, delimiter='\t')
+            for row in reader:
+                if not row:
+                    continue
+                if row['motif_id'].startswith('#'):
+                    continue
+                data.append(row)
 
-def multiMotifs_function(args):
+        for record in records:
+            for entry in data:
+                if record.id.startswith(entry['sequence_name']):
+                    entry['sequence_name']=record.id
+                    entry['sequence_length']=len(str(record.seq))
+        
+        for result in data:
+            entry={
+                'sequence_id':result['sequence_name'],
+                'sequence_length':result['sequence_length'],
+                'motif':f"fimo_{result['motif_id']}",
+                'start':result['start'],
+                'end':result['stop'],
+                'strand':result['strand'],
+                'p-value':result['p-value'],
+                'q-value':result['q-value'],
+                'fragment':result['matched_sequence']
+            }
+            fimo_results.append(entry)
+
+        fimo_results = sorted(fimo_results, key=lambda x: (x['sequence_id'], x['start']))
+
+        seen_positions = set()
+        unique_positions = set()
+        for result in fimo_results:
+            key = (result['sequence_id'], result['start'])           
+            if key not in seen_positions and result['strand'] == '+':
+                seen_positions.add(key)
+                fimo_results_filter.append(result)
+            elif key not in seen_positions:
+                unique_positions.add(key)
+                fimo_results_filter.append(result)
+
+        if not fimo_results_filter:
+            print("#No Result")
+        else:
+            with open(output_file_path2,'w') as output_file:
+                output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\tmismatches\tmatched_sequence\n")
+                for result in fimo_results_filter:
+                    output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['p-value']}\t{result['q-value']}\t{result['fragment']}\n")
+        plot_motifs_to_single_chart(output_file_path2, output_file_path2, display_both_directions=args.display_both_directions)
+
+        output_file_path3 = f"{output_dir}/merge.out"
+        merged_results = []
+        seen_keys = set()
+        for result in filtered_results:
+            key = f"{result['sequence_id']}_{result['sequence_length']}_{result['start']}_{result['end']}_{result['strand']}"
+            if key not in seen_keys:
+                seen_keys.add(key)
+                merged_results.append(result)
+        for result in fimo_results_filter:
+            key = f"{result['sequence_id']}_{result['sequence_length']}_{result['start']}_{result['end']}_{result['strand']}"
+            if key not in seen_keys:
+                seen_keys.add(key)
+                merged_results.append(result)
+            elif key in seen_keys:
+                for merged_result in merged_results:
+                    if all(str(merged_result[k]) == str(result[k]) for k in ('sequence_id', 'sequence_length', 'start', 'end', 'strand')):
+                        merged_result['motif'] = merged_result['motif'].replace('single', 'both')
+
+        with open(output_file_path3,'w') as output_file:
+            output_file.write("Sequence_ID\tSequence_Length\tmotif\tstart\tend\tstrand\n")
+            for result in merged_results:
+                output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\n")
+        plot_motifs_to_single_chart(output_file_path3, output_file_path3, display_both_directions=args.display_both_directions)
+
+def multiple_function(args):
     fasta_file_path = args.fasta
     motiflist = args.motiflist
-    max_mismatches = args.mismatches
     direction = args.direction
     output_dir = args.output_dir
+    n=args.mis_motif_nums
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
     records = list(SeqIO.parse(fasta_file_path, "fasta"))
     all_results = []
+    motif_results_pre = []
     output_file_path1 = f"{output_dir}/multiMotifs_list.out"
-    output_file_path2 = f"{output_dir}/multiMotifs_statistics.out"
-    n=args.mis_motif_nums
-    
+    output_file_path2 = f"{output_dir}/multiMotifs_statistics.out"    
+
     with open(motiflist, 'r') as file:
         line_count = sum(1 for line in file)
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 500000:
         with open(motiflist, 'r') as file:
             for line_number, line in enumerate(file, start=1):
-                motif = line 
+                motif = line.strip().split('\t')[0]
+                max_mismatches = int(line.strip().split('\t')[1])
                 if direction == '+' or direction == '+,-':  
                     motif_results_pre = process_genome_file_forward(fasta_file_path, motif, max_mismatches)
                     for result in motif_results_pre:
@@ -257,34 +367,36 @@ def multiMotifs_function(args):
                     for result in motif_results_pre:
                         result['motif_type'] = line_number
                     all_results.extend(motif_results_pre)
-        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+        all_results = sorted(all_results, key=lambda x: (x['motif_type'], x['sequence_id'], x['start']))
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
         with open(motiflist, 'r') as file:
             for line_number, line in enumerate(file, start=1):
-                motif = line
+                motif = line.strip().split('\t')[0]
+                max_mismatches = int(line.strip().split('\t')[1])
                 if direction == '+' or direction == '+,-':
                     motif_results = pool.starmap(search_motif, [(record, motif, max_mismatches, len(motif)) for record in records])
                     motif_results = [item for sublist in motif_results for item in sublist]
-                    for result in motif_results_pre:
-                        result['motif_type'] = line
+                    for result in motif_results:
+                        result['motif_type'] = line_number
                     all_results.extend(motif_results)
                 if direction == '-' or direction == '+,-':
                     motif_results = pool.starmap(reverse_search_fix, [(record, motif, max_mismatches, len(motif)) for record in records])
                     motif_results = [item for sublist in motif_results for item in sublist] #Flatten the list
-                    for result in motif_results_pre:
-                        result['motif_type'] = line
+                    for result in motif_results:
+                        result['motif_type'] = line_number
                     all_results.extend(motif_results)
-        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+        all_results = sorted(all_results, key=lambda x: (x['motif_type'], x['sequence_id'], x['start']))
     if args.protein:
         with open(motiflist, 'r') as file:
             for line_number, line in enumerate(file, start=1):
-                motif = line.strip()
+                motif = line.strip().split('\t')[0]
+                max_mismatches = int(line.strip().split('\t')[1])
                 motif_results = pool.starmap(search_motif_protein, [(record, motif, max_mismatches, len(motif)) for record in records])
                 motif_results = [item for sublist in motif_results for item in sublist]
                 for result in motif_results:
-                    result['motif_type'] = str(line_number)
+                    result['motif_type'] = line_number
                 all_results.extend(motif_results)
-        all_results = sorted(all_results, key=lambda x: (result['motif_type'], x['sequence_id'], x['start']))
+        all_results = sorted(all_results, key=lambda x: (x['motif_type'], x['sequence_id'], x['start']))
     if not all_results:
         print("#No Result")
     else:
@@ -309,11 +421,12 @@ def multiMotifs_function(args):
 
     motif_nums = line_count - n
     manyMotifs_results = []
-    filtered_results_sorted = sorted(filtered_results, key=lambda x: (x['sequence_id'], x['start']))
-    grouped_results = groupby(filtered_results_sorted, key=lambda x: x['sequence_id']) #'groupby'函数返回的是一个迭代器，每个元素都是在迭代时动态计算的。因此它返回的对象无法直接序列化。
+    filtered_results_sorted = sorted(filtered_results, key=lambda x: x['sequence_id'])
+
+    grouped_results = groupby(filtered_results_sorted, key=lambda x: x['sequence_id'])
     grouped_results_list = [(key,list(group)) for key, group in grouped_results]
     manyMotifs_results_pre1 = pool.starmap(filter_rows, [(group, motif_nums) for key, group in grouped_results_list])
-    manyMotifs_results_pre2 = [item for sublist in manyMotifs_results_pre1 for item in sublist]
+    manyMotifs_results_pre2 = [item for sublist in manyMotifs_results_pre1 if sublist is not None for item in sublist]
     manyMotifs_results.extend(manyMotifs_results_pre2)
     manyMotifs_results = sorted(manyMotifs_results, key=lambda x: x['sequence_id'])
     
@@ -328,22 +441,32 @@ def multiMotifs_function(args):
     if args.image:
         plot_motifs_to_single_chart(output_file_path2, output_file_path2, display_both_directions=args.display_both_directions)
 
-def variable_function(args):
+def regulator_function(args):
     fasta_file_path = args.fasta
     motif1 = args.motif1
     motif2 = args.motif2
-    max_mismatches = args.mismatches
+    max_mismatch1 = args.mismatch1
+    max_mismatch2 = args.mismatch2
     min_gap = args.min_gap
     max_gap = args.max_gap
     direction = args.direction
     pool = multiprocessing.Pool(multiprocessing.cpu_count())
     records = list(SeqIO.parse(fasta_file_path, "fasta"))
     all_results = []
+    output_dir = args.output_dir    
+    output_file_path = f"{output_dir}/regulator_variable_gap.out"
+
+    if args.mismatches is None:
+        args.mismatches = max_mismatch1 + max_mismatch2
+        max_mismatches = args.mismatches
+    else:
+        max_mismatches = args.mismatches
+
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) >= 5000:
         if direction == '+' or direction == '+,-':  
-            motif1_results_pre = process_genome_file_forward(fasta_file_path, motif1, max_mismatches, mmmm)
+            motif1_results_pre = process_genome_file_forward(fasta_file_path, motif1, max_mismatch1)
             motif1_results = sorted(motif1_results_pre, key=lambda x: (x['seq_name'], x['start']))
-            motif2_results_pre = process_genome_file_forward(fasta_file_path, motif2, max_mismatches, mmmm)
+            motif2_results_pre = process_genome_file_forward(fasta_file_path, motif2, max_mismatch2)
             motif2_results = sorted(motif2_results_pre, key=lambda x: (x['seq_name'], x['start']))
             num_chunks = multiprocessing.cpu_count()
             chunk_size = max(len(motif1_results) // num_chunks,1)
@@ -354,9 +477,9 @@ def variable_function(args):
                 combined_results = [item for sublist in combined_results for item in sublist]
                 all_results.extend(combined_results)		                   
         if direction == '-' or direction == '+,-':  
-            motif1_results_pre = process_genome_file_reverse(fasta_file_path, motif1, max_mismatches, mmmm)
+            motif1_results_pre = process_genome_file_reverse(fasta_file_path, motif1, max_mismatch1)
             motif1_results = sorted(motif1_results_pre, key=lambda x: (x['seq_name'], x['start']))
-            motif2_results_pre = process_genome_file_reverse(fasta_file_path, motif2, max_mismatches, mmmm)
+            motif2_results_pre = process_genome_file_reverse(fasta_file_path, motif2, max_mismatch2)
             motif2_results = sorted(motif2_results_pre, key=lambda x: (x['seq_name'], x['start']))
             num_chunks = multiprocessing.cpu_count()
             chunk_size = max(len(motif1_results) // num_chunks,1)
@@ -367,29 +490,31 @@ def variable_function(args):
                 all_results.extend(combined_results)
     if (args.DNA or args.RNA) and calculate_average_length(fasta_file_path) < 500000:
         if direction == '+' or direction == '+,-':
-            combined_results = pool.starmap(process_record_DNA_forward, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+            combined_results = pool.starmap(process_record_DNA_forward, [(record, motif1, motif2, max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap) for record in records])
             combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
             all_results.extend(combined_results)
         if direction == '-' or direction == '+,-':
-            combined_results = pool.starmap(process_record_DNA_reverse, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+            combined_results = pool.starmap(process_record_DNA_reverse, [(record, motif1, motif2, max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap) for record in records])
             combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
             all_results.extend(combined_results)
     if args.protein:
-        combined_results = pool.starmap(process_record_protein, [(record, motif1, motif2, max_mismatches, min_gap, max_gap) for record in records])
+        combined_results = pool.starmap(process_record_protein, [(record, motif1, motif2, max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap) for record in records])
         combined_results = [item for sublist in combined_results for item in sublist] #Flatten the list
         all_results.extend(combined_results)
     if not all_results:
         print("# No Result")
     else:
-        with open(args.output, 'w') as output_file:
+        with open(output_file_path, 'w') as output_file:
             output_file.write("Sequence_ID\tSequence_Length\tMotif\tstart\tend\tstrand\tmotif1_mismatch\tfragment1\tmotif2_mismatch\tfragment2\tmismatches\tgap_length\tmatched_sequence\n")
             for result in all_results:
                 output_file.write(f"{result['sequence_id']}\t{result['sequence_length']}\t{result['motif']}\t{result['start']}\t{result['end']}\t{result['strand']}\t{result['motif1_mismatch']}\t{result['fragment1']}\t{result['motif2_mismatch']}\t{result['fragment2']}\t{result['mismatch']}\t{result['gap_length']}\t{result['sequence']}\n")
     if args.image:
-        plot_motifs_to_single_chart(args.output, args.output, display_both_directions=args.display_both_directions)
+        plot_motifs_to_single_chart(output_file_path, output_file_path, display_both_directions=args.display_both_directions)
 
 def VisualMotif_function(args):
-    plot_motifs_to_single_chart(args.table_file, args.output, args.display_both_directions)
+    output_dir = args.output_dir    
+    output_file_path = f"{output_dir}/visualization"
+    plot_motifs_to_single_chart(args.table_file, output_file_path, args.display_both_directions)
 
 def generate_motif_variants(motif):
     variant_bases = []
@@ -440,8 +565,8 @@ def search_motif(record, motif, max_mismatches, motif_length):
                 'motif': motif,
                 'sequence_length':sequence_length,
                 'sequence_id': record.id,
-                'start': i,
-                'end': i + motif_length - 1,
+                'start': i + 1,
+                'end': i + motif_length ,
                 'mismatches': mismatches,
                 'fragment': fragment,
                 'strand': '+',
@@ -466,8 +591,8 @@ def reverse_search(record, motif, max_mismatches, motif_length):
                 'motif': motif,
                 'sequence_length':sequence_length,
                 'sequence_id': record.id,
-                'start': i,
-                'end': i + motif_length - 1,
+                'start': i + 1,
+                'end': i + motif_length,
                 'mismatches': mismatches,
                 'fragment': fragment,
                 'strand': '-',
@@ -491,8 +616,8 @@ def reverse_search_fix(record, motif, max_mismatches, motif_length):
                 'motif': motif,
                 'sequence_length':sequence_length,
                 'sequence_id': record.id,
-                'start': sequence_length - i - motif_length,
-                'end': sequence_length - i - 1,
+                'start': sequence_length - i - motif_length + 1,
+                'end': sequence_length - i,
                 'mismatches': mismatches,
                 'fragment': fragment,
                 'strand': '-',
@@ -526,8 +651,8 @@ def search_motif_protein(record, motif, max_mismatches, motif_length):
                 'motif': motif,
                 'sequence_id': record.id,
                 'sequence_length':sequence_length,
-                'start': i,
-                'end': i + motif_length - 1,
+                'start': i + 1,
+                'end': i + motif_length,
                 'mismatches': mismatches,
                 'fragment': fragment,
                 'strand': '+',
@@ -548,8 +673,8 @@ def process_window_forward(sequence_chunk, start, window_size, sequence_id, moti
                 'motif':motif,
                 'sequence_length':len_genome,
                 'sequence_id':sequence_id,
-                'start':start + i,
-                'end':start + i + window_size - 1,
+                'start':start + i + 1,
+                'end':start + i + window_size,
                 'mismatches':mismatches,
                 'fragment':fragment,
                 'strand':'+',
@@ -569,8 +694,8 @@ def process_window_reverse(sequence_chunk, start, window_size, sequence_id, moti
                 'motif':motif,
                 'sequence_length':len_genome,
                 'sequence_id':sequence_id,
-                'start':len_genome - (start + i) - window_size,
-                'end':len_genome - (start + i) - 1,
+                'start':len_genome - (start + i) - window_size + 1,
+                'end':len_genome - (start + i),
                 'mismatches':mismatches,
                 'fragment':fragment,
                 'strand':'-',
@@ -718,9 +843,7 @@ def combine_results_reverse(record, motif1_results_chunk, motif2_results,max_mis
 
 def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=False):
     df = pd.read_csv(file_path, sep='\t', header=None, dtype={0: str, 1: int, 2: str, 3: int, 4: int, 5: str}, usecols=[0, 1, 2, 3, 4, 5], skiprows=1, names=["Sequence ID", "Length", "Motif", "Start", "End", "Strand"])
-
     grouped_df = df.groupby("Sequence ID")
-
     num_sequences = len(grouped_df)
     height_interval = 0.5
     max_length = df["Length"].max()
@@ -729,7 +852,6 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
     fig, ax = plt.subplots(figsize=(line_length, num_sequences * 0.5))
     ax.axis('off')
-
 
     color_list = ['#008000','#FF0000', '#0000FF', '#FF00FF', '#00FFFF', '#FFFF00', '#800000', '#00FF00', '#000080', '#808000', '#800080', '#008080', '#808080', '#C0C0C0', '#FFA500']
     color_map = {}
@@ -812,23 +934,23 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
     output_file_png = f'{output_file}.png'
     plt.savefig(output_file_png, bbox_inches='tight',format='png')
 
-def process_record_protein(record, motif1, motif2, max_mismatches, min_gap, max_gap):
-    motif1_results = search_motif_protein(record, motif1, max_mismatches, len(motif1))
-    motif2_results_pre = search_motif_protein(record, motif2, max_mismatches, len(motif2))
+def process_record_protein(record, motif1, motif2,max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap):
+    motif1_results = search_motif_protein(record, motif1, max_mismatch1, len(motif1))
+    motif2_results_pre = search_motif_protein(record, motif2, max_mismatch2, len(motif2))
     motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
     combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
     return combined_results
 
-def process_record_DNA_forward(record, motif1, motif2, max_mismatches, min_gap, max_gap):
-    motif1_results = search_motif(record, motif1, max_mismatches, len(motif1))
-    motif2_results_pre = search_motif(record, motif2, max_mismatches, len(motif2))
+def process_record_DNA_forward(record, motif1, motif2,max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap):
+    motif1_results = search_motif(record, motif1, max_mismatch1, len(motif1))
+    motif2_results_pre = search_motif(record, motif2, max_mismatch2, len(motif2))
     motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
     combined_results = combine_results_forward(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
     return combined_results
 
-def process_record_DNA_reverse(record, motif1, motif2, max_mismatches, min_gap, max_gap):
-    motif1_results = reverse_search(record, motif1, max_mismatches, len(motif1))
-    motif2_results_pre = reverse_search(record, motif2, max_mismatches, len(motif2))
+def process_record_DNA_reverse(record, motif1, motif2,max_mismatch1, max_mismatch2, max_mismatches, min_gap, max_gap):
+    motif1_results = reverse_search(record, motif1, max_mismatch1, len(motif1))
+    motif2_results_pre = reverse_search(record, motif2, max_mismatch2, len(motif2))
     motif2_results = sorted(motif2_results_pre, key=lambda x: x['start'])
     combined_results = combine_results_reverse(record, motif1_results, motif2_results, max_mismatches, min_gap, max_gap)
     return combined_results
@@ -843,7 +965,7 @@ def calculate_average_length(sequence_file):
         sequence_count += 1
     
     if sequence_count == 0:
-        return 0  # Handle the case of an empty file
+        return 0 # Handle the case of an empty file
     
     average_length = total_length / sequence_count
     return average_length
@@ -859,42 +981,79 @@ def filter_rows(result_list,line_count):
         current_row = result_list[i]
         after_row = result_list[i + 1] if i + 1 < len(result_list) else None
         before_row = result_list[i - 1] if i - 1 >= 0 else None
+        if current_row['strand'] == "+":
+            if i == 0 and int(current_row['motif_type']) == 1:
+                m=0
+                while int(result_list[m]['motif_type']) == 1:
+                    m += 1
+                i = m - 1
+                filtered_rows.append(result_list[i])
+                motif_type.append(result_list[m]['motif_type'])
+                i += 1
 
-        if i == 0 and int(current_row['motif_type']) == 1:
-            m=0
-            while int(result_list[m]['motif_type']) == 1:
-                m += 1
-            i = m - 1
-            filtered_rows.append(result_list[i])
-            motif_type.append(result_list[m]['motif_type'])
-            i += 1
-        # 检查数值和位置的条件
-
-        elif after_row is not None and before_row is not None and 'motif_type' in current_row and 'motif_type' in after_row and current_row['motif_type'] < after_row['motif_type'] and current_row['end'] < after_row['start'] and current_row['start'] > before_row['end']:
-            filtered_rows.append(current_row)
-            motif_type.append(current_row['motif_type'])
-            i += 1
-        elif after_row is not None and before_row is not None and current_row['motif_type'] > after_row['motif_type'] and current_row['motif_type'] > before_row['motif_type']:
-            if after_row['motif_type'] in motif_type and current_row['start'] > before_row['end']:
+            elif after_row is not None and before_row is not None and 'motif_type' in current_row and 'motif_type' in after_row and current_row['motif_type'] < after_row['motif_type'] and current_row['end'] < after_row['start'] and current_row['start'] > before_row['end']:
                 filtered_rows.append(current_row)
                 motif_type.append(current_row['motif_type'])
-                i += 2
-            elif after_row['motif_type'] not in motif_type and after_row['start'] > before_row['end']:
-                filtered_rows.append(after_row)
-                motif_type.append(after_row['motif_type'])
-                i += 2
+                i += 1
+            elif after_row is not None and before_row is not None and current_row['motif_type'] > after_row['motif_type'] and current_row['motif_type'] > before_row['motif_type']:
+                if after_row['motif_type'] in motif_type and current_row['start'] > before_row['end']:
+                    filtered_rows.append(current_row)
+                    motif_type.append(current_row['motif_type'])
+                    i += 2
+                elif after_row['motif_type'] not in motif_type and after_row['start'] > before_row['end']:
+                    filtered_rows.append(after_row)
+                    motif_type.append(after_row['motif_type'])
+                    i += 2
+                else:
+                    i += 2
+            elif before_row is not None and current_row['motif_type'] == line_count and current_row['start'] > before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                break
+            elif before_row is not None and i == len(result_list) -1 and current_row['start'] > before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                break
             else:
-                i += 2
-        elif before_row is not None and current_row['motif_type'] == line_count and current_row['start'] > before_row['end']:
-            filtered_rows.append(current_row)
-            motif_type.append(current_row['motif_type'])
-            break
-        elif before_row is not None and i == len(result_list) -1 and current_row['start'] > before_row['end']:
-            filtered_rows.append(current_row)
-            motif_type.append(current_row['motif_type'])
-            break
+                i += 1
+
         else:
-            i += 1
+            if i == 0 and int(current_row['motif_type']) == 1:
+                m=0
+                while int(result_list[m]['motif_type']) == 1:
+                    m += 1
+
+                i = m - 1
+                filtered_rows.append(result_list[i])
+                motif_type.append(result_list[m]['motif_type'])
+                i += 1
+
+            elif after_row is not None and before_row is not None and 'motif_type' in current_row and 'motif_type' in after_row and current_row['motif_type'] < after_row['motif_type'] and current_row['end'] > after_row['start'] and current_row['start'] < before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                i += 1
+            elif after_row is not None and before_row is not None and current_row['motif_type'] > after_row['motif_type'] and current_row['motif_type'] > before_row['motif_type']:
+                if after_row['motif_type'] in motif_type and current_row['start'] < before_row['end']:
+                    filtered_rows.append(current_row)
+                    motif_type.append(current_row['motif_type'])
+                    i += 2
+                elif after_row['motif_type'] not in motif_type and after_row['start'] < before_row['end']:
+                    filtered_rows.append(after_row)
+                    motif_type.append(after_row['motif_type'])
+                    i += 2
+                else:
+                    i += 2
+            elif before_row is not None and current_row['motif_type'] == line_count and current_row['start'] < before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                break
+            elif before_row is not None and i == len(result_list) -1 and current_row['start'] < before_row['end']:
+                filtered_rows.append(current_row)
+                motif_type.append(current_row['motif_type'])
+                break
+            else:
+                i += 1
+
     return filtered_rows
 
 def main():
