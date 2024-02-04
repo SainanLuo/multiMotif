@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='multiMotif',
-    version='1.0.8',
+    version='1.0.10',
     packages=find_packages(),
     install_requires=[
         'biopython>=1.78',
@@ -21,7 +21,7 @@ setup(
     url='https://github.com/Sienna-L/multiMotif',
     entry_points={
         'console_scripts': [
-            'multimotif=multimotif.main:main',
+            'multiMotif=multiMotif.main:main',
         ],
     },
 )
