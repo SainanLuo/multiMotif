@@ -1,0 +1,2 @@
+Sequence_ID	Sequence_Length	motif	start	end	strand	mismatches	matched_sequence
+random	248	single_ACCGUUUUGAAAGGCG	173	188	+	0	ACCGUUUUGAAAGGCG
