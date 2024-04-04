@@ -12,13 +12,14 @@ setup(
         'biopython>=1.78',
         'matplotlib>=3.3',
         'numpy>=1.19',
-        'pandas>=1.1'
+        'pandas>=1.1',
+        'plotly>=5.18.0'
     ],
     author='Sainan Luo',
     description='A Computational Tool for Variable Motif scanning and Sequence-based Relative Position Visualization of Search Results in Sequences.',
     long_description=long_description,  # The new line
     long_description_content_type='text/markdown',  # The new line
-    url='https://github.com/Sienna-L/multiMotif',
+    url='https://github.com/SainanLuo/multiMotif',
     entry_points={
         'console_scripts': [
             'multiMotif=multiMotif.main:main',
