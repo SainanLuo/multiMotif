@@ -6,14 +6,15 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='multiMotif',
-    version='1.2.1',
+    version='1.2.3',
     packages=find_packages(),
     install_requires=[
         'biopython>=1.78',
         'matplotlib>=3.3',
         'numpy>=1.19',
         'pandas>=1.1',
-        'plotly>=5.18.0'
+        'plotly>=5.18.0',
+        'kaleido>=0.2.1'
     ],
     author='Sainan Luo',
     description='A Computational Tool for Variable Motif scanning and Sequence-based Relative Position Visualization of Search Results in Sequences.',
