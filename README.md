@@ -67,6 +67,6 @@ optional arguments:
 
 multiMotif tool features modules for identifying single motifs(‘singleMotif’), multiple motifs(‘multiMotif’), a visualization module (‘visualMotif’) to enhance results interpretation, and a sequence extraction module (‘extract_sequences’) for obtaining promoters or open reading frames, or user-specified locations. 
 
-We provide comprehensive user manuals in both Chinese and English. You can download the English version of the manual at [English Language User Manual Download Link](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.3/multiMotif_Installation_UsageInstructions_EnglishLanguage.pdf). For the Chinese version, please visit this link:[Chinese Language User Manual Download Link](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.3/multiMotif_Installation_UsageInstructions_ChineseLanguage.pdf).
+We provide comprehensive user manuals in both Chinese and English. You can download the English version of the manual at [English Language User Manual Download Link](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.5/multiMotif_Installation_UsageInstructions_EnglishLanguage.pdf). For the Chinese version, please visit this link:[Chinese Language User Manual Download Link](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.5/multiMotif_Installation_UsageInstructions_ChineseLanguage.pdf).
 
 
