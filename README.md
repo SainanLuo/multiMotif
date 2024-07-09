@@ -18,16 +18,9 @@ cd multiMotif
 pip install .
 ```
 
-If you are a Windows user, make sure you installed [Python3](https://www.python.org/downloads/), then run this command in your `cmd` or `PowerShell`:
 
-```
-C:\Users\lsn> set PATH=C:\Users\lsn\AppData\Local\Programs\Python\Python311 #set your Python path in cmd window
-C:\Users\lsn> set PATH=C:\Users\lsn\AppData\Local\Programs\Python\Python311\Scripts #set your pip path in cmd window
-C:\Users\lsn> pip install multiMotif
-C:\Users\lsn> multiMotif -h
-```
+As a Windows user, you can choose to download [the installation package](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.5/multiMotif.exe) and follow the prompts to install it.
 
-As a Windows user, you can also choose to download [the installation package](https://github.com/SainanLuo/multiMotif/releases/download/v1.2.5/multiMotif.exe) and follow the prompts to install it.
 
 ## Dependencies
 
@@ -43,7 +36,10 @@ multiMotif requires the following packages:
 
 `plotly (>=5.18.0)`
 
+`kaleido(>=0.2.1)`
+
 These dependencies will be installed automatically when you install multiMotif using pip.
+
 
 ## Usage
 
