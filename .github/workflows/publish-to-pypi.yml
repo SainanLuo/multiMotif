@@ -2,10 +2,6 @@ name: Publish Python 🐍 Package to PyPI
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - '**/main.py'
     tags:
       - '*'
 
