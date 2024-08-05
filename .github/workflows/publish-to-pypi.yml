@@ -3,9 +3,9 @@ name: Publish Python 🐍 Package to PyPI
 on:
   push:
     branches:
-      - 'main/**'
+      - main
     paths:
-      - 'multiMotif/**.py'
+      - '**/main.py'
     tags:
       - '*'
 
