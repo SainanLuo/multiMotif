@@ -1160,7 +1160,7 @@ def filter_rows(result_list, motif_nums, line_count,motif_must=set()):
                 for i in result_index:
                     filtered_temp.append(num_list[i])
 
-                # Check and count occurrences in num_list_add
+
                 count_filtered_temp_in_num_list_add=0
                 for item in filtered_temp:
                     if  any(item == tpl[0] for sublist in num_list_add for tpl in sublist):
