@@ -936,7 +936,7 @@ def check_sequential_numbers(nums,sorted_nums, m):
             else:
                 for x in range(i, len(nums)):
                     if nums[x] == sorted_nums[count]:
-                        if x-i >=m and len(ordered_nums)+len(sorted_nums)-1-count >=m:
+                        if len(nums)-x+len(ordered_nums) < m:
                             count+=1
                         else:
                             ordered_nums.append((nums[x], x))
@@ -949,6 +949,21 @@ def check_sequential_numbers(nums,sorted_nums, m):
         return [[index for _, index in ordered_nums]]
     else:
         return None
+
+def remove_overlapping_lists_by_length(list_of_lists):
+    # 按列表长度降序排序
+    sorted_lists = sorted(list_of_lists, key=len, reverse=True)
+    result = []  # 存储最终结果的列表
+
+    # 遍历排序后的列表
+    while sorted_lists:#遍历改列表，直到列表为空
+        longest = sorted_lists.pop(0)  # 取出当前最长的列表,pop是操作命令，源列表会越来越短
+        result.append(longest)  # 将当前最长的列表添加到结果中
+        sorted_lists = [
+            lst for lst in sorted_lists
+            if not any(d in longest for d in lst)]  # 移除与最长列表有重叠的所有列表 #只有lst与最长列表没有重合的时候，lst才会留下来
+
+    return result
 
 def filter_rows(result_list, motif_nums, line_count,motif_must=set()):
 
@@ -1028,38 +1043,57 @@ def filter_rows(result_list, motif_nums, line_count,motif_must=set()):
             else:
                 g_end = sublist[-1][1]
 
-            if g_end - f_start + 1 < motif_nums:
-                break
-
             num_list = result_list[f_start:g_end + 1]
-            num_list_index = [(result_list[i], i) for i in range(f_start, g_end + 1)]
-            num_list_add.append(num_list_index)
             nums = [row['motif_type'] for row in num_list]
             sorted_nums = sorted(set(nums))
-
             result_index = check_sequential_numbers(nums, sorted_nums, motif_nums)
 
-            if result_index is None:
-                if filtered_rows:
-                    return filtered_rows
-                else:
-                    return None
+            if result_index is None:                
+                continue
             else:
                 result_index = [item for expand in result_index if expand is not None for item in expand]
                 for i in result_index:
                     filtered_temp.append(num_list[i])
 
+                # Check and count occurrences in num_list_add
+                count_filtered_temp_in_num_list_add=0
+                for item in filtered_temp:
+                    if  any(item == tpl[0] for sublist in num_list_add for tpl in sublist):
+                        count_filtered_temp_in_num_list_add += 1
+                if count_filtered_temp_in_num_list_add >= motif_nums:
+                    continue
+                
                 if motif_must:
                     data_list = set([row['motif_type'] for row in filtered_temp])
                     if motif_must.issubset(data_list):
                         filtered_rows.append(filtered_temp)
                     else:
-                        if filtered_rows:
-                            return filtered_rows
-                        else:
-                            return None
+                        continue
                 else:
                     filtered_rows.append(filtered_temp)
+            
+            num_list_index = [(result_list[i], i) for i in range(f_start, g_end + 1)]
+            num_list_add.append(num_list_index)
+
+        if filtered_rows is None:
+            num_list = result_list
+            nums = [row['motif_type'] for row in num_list]
+            sorted_nums = sorted(set(nums))
+            result_index = check_sequential_numbers(nums, sorted_nums, motif_nums)
+            if result_index is None:
+                return None
+            else:
+                result_index = [item for expand in result_index if expand is not None for item in expand]
+                for i in result_index:
+                    filtered_temp.append(num_list[i])
+                if motif_must:
+                    data_list = set([row['motif_type'] for row in filtered_temp])
+                    if motif_must.issubset(data_list):
+                        filtered_rows.append(filtered_temp)
+                    else:
+                        return None
+                else:
+                    filtered_rows.append(filtered_temp)                        
 
     else:
         while i < len(result_list) -1:
@@ -1113,39 +1147,60 @@ def filter_rows(result_list, motif_nums, line_count,motif_must=set()):
                             break
             else:
                 g_end = sublist[-1][1]
-            if g_end - f_start + 1 < motif_nums:
-                break
 
             num_list = result_list[f_start:g_end + 1]
-            num_list_index = [(result_list[i], i) for i in range(f_start, g_end + 1)]
-            num_list_add.append(num_list_index)
             nums = [row['motif_type'] for row in num_list]
             sorted_nums = sorted(set(nums),reverse=True)
-
             result_index = check_sequential_numbers(nums, sorted_nums, motif_nums)
 
             if result_index is None:
-                if filtered_rows:
-                    return filtered_rows
-                else:
-                    return None
+                continue
             else:
                 result_index = [item for expand in result_index if expand is not None for item in expand]
                 for i in result_index:
                     filtered_temp.append(num_list[i])
+
+                # Check and count occurrences in num_list_add
+                count_filtered_temp_in_num_list_add=0
+                for item in filtered_temp:
+                    if  any(item == tpl[0] for sublist in num_list_add for tpl in sublist):
+                        count_filtered_temp_in_num_list_add += 1
+                if count_filtered_temp_in_num_list_add >= motif_nums:
+                    continue
 
                 if motif_must:
                     data_list = set([row['motif_type'] for row in filtered_temp])
                     if motif_must.issubset(data_list):
                         filtered_rows.append(filtered_temp)
                     else:
-                        if filtered_rows:
-                            return filtered_rows
-                        else:
-                            return None
+                        continue
                 else:
                     filtered_rows.append(filtered_temp)
-    return filtered_rows
+
+            num_list_index = [(result_list[i], i) for i in range(f_start, g_end + 1)]
+            num_list_add.append(num_list_index)            
+
+        if filtered_rows is None:
+            num_list = result_list
+            nums = [row['motif_type'] for row in num_list]
+            sorted_nums = sorted(set(nums),reverse=True)
+            result_index = check_sequential_numbers(nums, sorted_nums, motif_nums)
+            if result_index is None:
+                return None
+            else:
+                result_index = [item for expand in result_index if expand is not None for item in expand]
+                for i in result_index:
+                    filtered_temp.append(num_list[i])
+                if motif_must:
+                    data_list = set([row['motif_type'] for row in filtered_temp])
+                    if motif_must.issubset(data_list):
+                        filtered_rows.append(filtered_temp)
+                    else:
+                        return None
+                else:
+                    filtered_rows.append(filtered_temp)   
+
+    return remove_overlapping_lists_by_length(filtered_rows)
 
 def draw_triangle(fig, point1, point2, point3, color='blue', row=None, col=None):
     fig.add_trace(
