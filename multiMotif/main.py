@@ -1520,6 +1520,5 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
 def main():
     get_args()
-
 if __name__ == "__main__":
     main()
