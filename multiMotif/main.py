@@ -951,17 +951,17 @@ def check_sequential_numbers(nums,sorted_nums, m):
         return None
 
 def remove_overlapping_lists_by_length(list_of_lists):
-    # 按列表长度降序排序
-    sorted_lists = sorted(list_of_lists, key=len, reverse=True)
-    result = []  # 存储最终结果的列表
 
-    # 遍历排序后的列表
-    while sorted_lists:#遍历改列表，直到列表为空
-        longest = sorted_lists.pop(0)  # 取出当前最长的列表,pop是操作命令，源列表会越来越短
-        result.append(longest)  # 将当前最长的列表添加到结果中
+    sorted_lists = sorted(list_of_lists, key=len, reverse=True)
+    result = []
+
+
+    while sorted_lists:
+        longest = sorted_lists.pop(0)
+        result.append(longest)
         sorted_lists = [
             lst for lst in sorted_lists
-            if not any(d in longest for d in lst)]  # 移除与最长列表有重叠的所有列表 #只有lst与最长列表没有重合的时候，lst才会留下来
+            if not any(d in longest for d in lst)]
 
     return result
 
