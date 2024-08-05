@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'multiMotif/multiMotif/main.py'
+      - 'multiMotif/main.py'
     tags:
       - '*'
 
