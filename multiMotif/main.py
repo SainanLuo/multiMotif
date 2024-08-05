@@ -1507,7 +1507,6 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
         fig.update_yaxes(visible=False)
         fig.update_layout(autosize=True,height=height,width= screen_width, yaxis_range=[0, num_sequences*2 + 1],plot_bgcolor='rgba(0,0,0,0)',margin=dict(t=10, l=5, r=5, b=20), title=None, showlegend=True, xaxis_title=None,yaxis_title=None)
 
-
         fig.update_yaxes(
             fixedrange=True,
             showgrid=True
