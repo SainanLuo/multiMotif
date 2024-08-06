@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='multiMotif',
-    version='1.2.5',
+    version='1.2.6',
     packages=find_packages(),
     install_requires=[
         'biopython>=1.78',

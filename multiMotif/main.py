@@ -950,11 +950,11 @@ def check_sequential_numbers(nums,sorted_nums, m):
     else:
         return None
 
+
 def remove_overlapping_lists_by_length(list_of_lists):
 
     sorted_lists = sorted(list_of_lists, key=len, reverse=True)
     result = []
-
 
     while sorted_lists:
         longest = sorted_lists.pop(0)
@@ -1055,7 +1055,7 @@ def filter_rows(result_list, motif_nums, line_count,motif_must=set()):
                 for i in result_index:
                     filtered_temp.append(num_list[i])
 
-                # Check and count occurrences in num_list_add
+
                 count_filtered_temp_in_num_list_add=0
                 for item in filtered_temp:
                     if  any(item == tpl[0] for sublist in num_list_add for tpl in sublist):
@@ -1507,6 +1507,7 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
         fig.update_yaxes(visible=False)
         fig.update_layout(autosize=True,height=height,width= screen_width, yaxis_range=[0, num_sequences*2 + 1],plot_bgcolor='rgba(0,0,0,0)',margin=dict(t=10, l=5, r=5, b=20), title=None, showlegend=True, xaxis_title=None,yaxis_title=None)
 
+
         fig.update_yaxes(
             fixedrange=True,
             showgrid=True
@@ -1519,5 +1520,6 @@ def plot_motifs_to_single_chart(file_path, output_file, display_both_directions=
 
 def main():
     get_args()
+
 if __name__ == "__main__":
     main()
